@@ -1,0 +1,1 @@
+# Admin CLI scripts for StoryForge component management

@@ -7,22 +7,20 @@ Tables:
 """
 
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     CheckConstraint,
     Float,
     ForeignKey,
     Index,
-    Integer,
     String,
     Text,
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from backend.app.db.declarative_base import Base
 from backend.app.models.mixins import TimestampMixin
 
 
@@ -92,10 +90,10 @@ class Component(Base, TimestampMixin):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     prompt_fragment: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[list[str]] = mapped_column(
-        ARRAY(Text()), nullable=False, server_default="{}"
+        ARRAY(Text()), nullable=False, server_default="{}",
     )
     compatibility_tags: Mapped[list[str]] = mapped_column(
-        ARRAY(Text()), nullable=False, server_default="{}"
+        ARRAY(Text()), nullable=False, server_default="{}",
     )
     rarity_weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     metadata_: Mapped[dict | None] = mapped_column(

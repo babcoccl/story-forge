@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.base import Base
+from backend.app.db.declarative_base import Base
 from backend.app.models.mixins import TimestampMixin
 
 
@@ -78,6 +78,7 @@ class Story(Base, TimestampMixin):
     )
     chapters: Mapped[list["StoryChapter"]] = relationship(back_populates="story")
     agent_runs: Mapped[list["AgentRun"]] = relationship(back_populates="story")
+    component_links: Mapped[list["StoryComponentLink"]] = relationship(back_populates="story")
 
 
 # ---------------------------------------------------------------------------

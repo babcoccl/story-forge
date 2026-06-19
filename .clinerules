@@ -1,0 +1,203 @@
+# StoryForge — .clinerules
+# Project-level standing instructions for Cline (Plan + Act mode)
+# Model: Qwen3 27B via llama.cpp
+# Last updated: Phase 1 complete
+
+---
+
+## Project Overview
+
+This is **StoryForge**, a multi-agent AI story generation application.
+- Backend: Python 3.11, FastAPI, SQLAlchemy async, PostgreSQL, Alembic
+- Inference: llama.cpp (OpenAI-compatible server at `LLM_BASE_URL`)
+- Frontend: React/Vite (Phase 10 — not yet built)
+- Dev environment: Ubuntu 24.04, local machine, `.venv` at project root
+
+The application uses a pipeline of specialized LLM agents (planner, scene_writer, continuity, judge, wordsmith) orchestrated by a Python backend to generate 10k–25k word stories from a database of story components.
+
+---
+
+## Critical Rules — Read Before Planning
+
+1. **Never implement code outside the current phase scope.** Each spec document defines explicit out-of-scope items. Do not implement them early even if they seem easy.
+2. **Always activate the virtual environment** before running any Python commands: `source ~/story-forge/.venv/bin/activate`
+3. **Never modify `.env` directly.** Only modify `.env.example`. The developer manages `.env` manually.
+4. **Never hardcode secrets, passwords, or URLs.** Always read from `app.config.settings`.
+5. **Never drop or alter existing tables** unless the spec explicitly requires a migration. Always use `alembic revision --autogenerate` for schema changes.
+6. **Run the verification checklist** at the end of every phase before declaring it complete.
+7. **Do not install packages** not listed in `requirements.txt` or `requirements-dev.txt` without noting the addition in your plan.
+
+---
+
+## Environment
+
+- Project root: `~/story-forge/`
+- Virtual environment: `~/story-forge/.venv/`
+- Python binary: `~/story-forge/.venv/bin/python`
+- Alembic: run from `~/story-forge/backend/` directory
+- FastAPI app entry point: `backend/app/main.py` → `app`
+- Config loaded from: `~/story-forge/.env`
+
+Always run Python commands as:
+```bash
+cd ~/story-forge && source .venv/bin/activate && <command>
+```
+
+Always run Alembic commands as:
+```bash
+cd ~/story-forge/backend && ../.venv/bin/alembic <command>
+```
+
+---
+
+## Code Style
+
+- **Python:** Follow PEP 8. Use `black` for formatting, `ruff` for linting.
+- **Naming:** `snake_case` for all Python variables, functions, modules, and filenames. `PascalCase` for classes. `UPPER_SNAKE_CASE` for constants.
+- **SQLAlchemy:** Always use SQLAlchemy 2.0 `Mapped` + `mapped_column` style. Never use legacy `Column()` syntax.
+- **Pydantic:** Use Pydantic v2 style (`model_config`, `field_validator`, not v1 `@validator`).
+- **Async:** All database operations must be `async`. Use `AsyncSession` from `app.db.session`. Never use synchronous SQLAlchemy in application code (only in Alembic `env.py`).
+- **Imports:** Absolute imports only within `backend/app/`. No relative imports.
+- **Type hints:** All function signatures must have full type annotations including return types.
+- **Docstrings:** Public functions and classes require a one-line docstring minimum.
+
+---
+
+## File Organization Rules
+
+- Models live in `backend/app/models/` — one file per domain (`component.py`, `story.py`, `agent.py`).
+- Pydantic schemas live in `backend/app/schemas/` — mirror model filenames.
+- Service logic lives in `backend/app/services/` — one service per domain.
+- Agent classes live in `backend/app/agents/` — one file per agent.
+- API route handlers live in `backend/app/api/v1/` — one router file per resource.
+- Orchestration pipeline lives in `backend/app/orchestrator/pipeline.py`.
+- CLI scripts live in `backend/scripts/` — executable Python scripts prefixed with the phase they were introduced.
+- Tests live in `backend/tests/` — mirror the `app/` structure.
+
+When creating a new file, always check that:
+1. The directory already exists (create it if not).
+2. An `__init__.py` exists in the directory (create it if not).
+3. The file is imported where needed (e.g., models must be imported in `app/db/base.py`).
+
+---
+
+## Database Rules
+
+- **All primary keys** are UUID, generated server-side via `uuid_generate_v4()`. Never use integer PKs.
+- **All timestamps** use `TIMESTAMPTZ` (timezone-aware). Use `TimestampMixin` from `app/models/mixins.py`.
+- **Schema changes** always go through Alembic. Never use `Base.metadata.create_all()` in production code.
+- **Foreign keys** must have explicit `ondelete` behavior defined (`CASCADE` or `RESTRICT`), per the spec.
+- **JSONB fields** should have a comment explaining their expected structure.
+- After any migration, verify with: `alembic current` and `alembic history`.
+- Model files MUST import Base from `backend.app.db.declarative_base` only. Never import Base from `backend.app.db.base` in model files. This prevents circular imports. Only `alembic/env.py` imports from `db/base`.
+
+---
+
+## TODO Stub Convention
+
+All placeholder files must follow this format exactly:
+
+```python
+# TODO Phase N: <one-line description of what this module will implement>
+# See SPEC_PHASE_N_*.md for full specification.
+```
+
+Do not leave empty files. Every stub must have the TODO comment.
+
+---
+
+## Testing Rules
+
+- Tests live in `backend/tests/`.
+- Use `pytest` with `pytest-asyncio`.
+- Every service function must have at least one test.
+- Tests must not make real LLM calls — mock the LLM client.
+- Tests must not require a running database — use SQLite in-memory or mock the session.
+- Run tests with: `cd ~/story-forge && .venv/bin/pytest backend/tests/ -v`
+
+---
+
+## Git Conventions
+
+- Do not commit `.env`, `*.pyc`, or `__pycache__/`.
+- The developer handles all `git` operations manually. Do not run `git add`, `git commit`, or `git push` unless explicitly asked.
+- Do not modify `.gitignore` unless the spec requires it.
+
+---
+
+## Verification Checklist Template
+
+At the end of every phase, run the following commands and confirm all pass before declaring completion:
+
+```bash
+# 1. Linting
+cd ~/story-forge && .venv/bin/ruff check backend/
+
+# 2. Imports
+cd ~/story-forge && .venv/bin/python -c "from backend.app.main import app; print('App import OK')"
+
+# 3. Phase-specific checks defined in spec document
+
+# 4. FastAPI health
+cd ~/story-forge && .venv/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 &
+sleep 2 && curl -s http://localhost:8000/health
+kill %1
+```
+
+---
+
+## Phase Status
+
+| Phase | Title | Status |
+|-------|-------|--------|
+| 0 | Repo Skeleton | ✅ Complete |
+| 1 | DB Schema + Migrations | ✅ Complete |
+| 2 | Component Ingest + Admin Scripts | ✅ Complete |
+| 3 | Sampler Engine + Constraint Validator | ✅ Complete |
+| 4 | Judge Agent + Reroll Loop | ⬜ Not Started |
+| 5 | Planner Agent + Story Bible | ⬜ Not Started |
+| 6 | Scene Writer + Chapter Assembly | ⬜ Not Started |
+| 7 | Continuity + Wordsmith Agents | ⬜ Not Started |
+| 8 | Continuation Mode + Story State | ⬜ Not Started |
+| 9 | FastAPI Endpoints + SSE Stream | ⬜ Not Started |
+| 10 | React UI Dashboard | ⬜ Not Started |
+
+Update this table at the start of each new phase spec handoff.
+
+---
+
+## LLM Integration Notes
+
+- llama.cpp is exposed as an OpenAI-compatible HTTP server.
+- All LLM calls go through a single adapter at `backend/app/agents/base_agent.py`.
+- Never call the LLM server directly from services or route handlers — always go through an agent class.
+- The base agent handles retries, token counting, and logging to `agent_runs` table.
+- Default model: `qwen3-27b` (set in `.env` as `DEFAULT_MODEL`).
+- Qwen3 performs best with explicit role definitions, step-by-step reasoning instructions, and JSON output schemas in prompts. Structure all agent prompts accordingly.
+
+## CLI Script Rules
+- Every script in backend/scripts/ MUST include the following path bootstrap
+  as the first code after the module docstring, before any app imports:
+
+  import sys
+  from pathlib import Path
+  sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+- This ensures scripts run correctly from any working directory.
+- pyproject.toml with `pip install -e .` is the permanent fix but the
+  bootstrap must still be present as a fallback.
+
+  ## Settings Access Rule
+Always access settings fields using lowercase snake_case attribute names matching
+the field definitions in backend/app/config.py. Never use UPPER_CASE env var names
+directly on the settings object.
+  Correct:   settings.database_url
+  Incorrect: settings.DATABASE_URL
+
+  ## Session Usage Rule
+Scripts and demos must never construct their own engine or sessionmaker.
+Always import and use AsyncSessionLocal from backend.app.db.session:
+
+  from backend.app.db.session import AsyncSessionLocal
+  async with AsyncSessionLocal() as db:
+      ...

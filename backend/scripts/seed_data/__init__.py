@@ -1,0 +1,1 @@
+# Seed data for StoryForge component batch imports

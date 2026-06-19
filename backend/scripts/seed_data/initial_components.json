@@ -1,0 +1,538 @@
+{
+  "component_types": [
+    {
+      "name": "character",
+      "display_name": "Characters",
+      "description": "Story characters with personalities, backgrounds, and roles.",
+      "is_active": true
+    },
+    {
+      "name": "setting",
+      "display_name": "Settings",
+      "description": "Story environments, locations, and worlds.",
+      "is_active": true
+    },
+    {
+      "name": "activity",
+      "display_name": "Activities",
+      "description": "Core story activities and narrative drivers.",
+      "is_active": true
+    },
+    {
+      "name": "plot_beat",
+      "display_name": "Plot Beats",
+      "description": "Structural story beats and narrative milestones.",
+      "is_active": true
+    },
+    {
+      "name": "trait",
+      "display_name": "Traits",
+      "description": "Character personality traits and attributes.",
+      "is_active": true
+    },
+    {
+      "name": "clothing",
+      "display_name": "Clothing",
+      "description": "Character attire and costume elements.",
+      "is_active": true
+    },
+    {
+      "name": "theme",
+      "display_name": "Themes",
+      "description": "Overarching story themes and motifs.",
+      "is_active": true
+    }
+  ],
+  "components": [
+    {
+      "component_type": "character",
+      "name": "Elara Moonwhisper",
+      "slug": "elara-moonwhisper",
+      "description": "A young elven sorceress who draws power from lunar magic. She carries the burden of a prophecy that marks her as either the world's savior or its destroyer. Her silver hair glows faintly in moonlight, and her eyes hold the wisdom of centuries despite her youth.",
+      "prompt_fragment": "an elven sorceress wielding lunar magic, silver-haired with ancient eyes",
+      "tags": ["fantasy", "elven", "magic", "female", "lunar"],
+      "compatibility_tags": ["forest", "medieval", "mystical", "mountain", "ancient"],
+      "rarity_weight": 1.5,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Kael Ironheart",
+      "slug": "kael-ironheart",
+      "description": "A dwarven blacksmith-warrior forged in the mountain forges of Khazad-Dûm. His armor is decorated with runes of protection, and his warhammer can shatter stone. Despite his gruff exterior, he possesses an unwavering loyalty to his allies.",
+      "prompt_fragment": "a dwarven warrior in rune-etched armor wielding a stone-shattering warhammer",
+      "tags": ["fantasy", "dwarven", "warrior", "male", "mountain"],
+      "compatibility_tags": ["medieval", "mountain", "underground", "fire-magic", "forge"],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Detective Maya Rodriguez",
+      "slug": "detective-maya-rodriguez",
+      "description": "A sharp-witted homicide detective in a sprawling modern metropolis. Her investigative instincts are unmatched, but her personal life is a mess of broken relationships and sleepless nights. She sees patterns in chaos that others miss.",
+      "prompt_fragment": "a sharp modern detective in a worn trench coat, analytical and exhausted",
+      "tags": ["modern", "urban", "detective", "female", "noir"],
+      "compatibility_tags": ["urban", "modern", "rain", "night", "crime"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Commander Jax Voren",
+      "slug": "commander-jax-voren",
+      "description": "A battle-hardened starship commander serving in the Outer Rim Coalition. Years of deep-space combat have left him cynical but effective. His cybernetic eye can scan entire battlefields in milliseconds, making him an invaluable tactical asset.",
+      "prompt_fragment": "a cybernetic-eyed starship commander in a worn military uniform",
+      "tags": ["sci-fi", "space", "military", "male", "cybernetic"],
+      "compatibility_tags": ["space", "sci-fi", "futuristic", "station", "alien"],
+      "rarity_weight": 1.3,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Sable the Sandrunner",
+      "slug": "sable-sandrunner",
+      "description": "A desert nomad and skilled mercenary who navigates the endless dunes with uncanny precision. She trades in secrets rather than gold, and her network of informants spans the entire arid continent. Her face is always veiled against the sandstorms.",
+      "prompt_fragment": "a veiled desert mercenary navigating endless golden dunes",
+      "tags": ["desert", "mercenary", "female", "nomad", "arid"],
+      "compatibility_tags": ["desert", "arid", "ancient", "oasis", "ruins"],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Professor Aris Thorne",
+      "slug": "professor-aris-thorne",
+      "description": "An eccentric academic who has dedicated his life to studying forgotten civilizations. His lecture halls are always packed, but his true passion lies in the dusty archives where he deciphers ancient texts. He speaks six dead languages fluently.",
+      "prompt_fragment": "an eccentric professor surrounded by ancient texts and artifacts",
+      "tags": ["modern", "academic", "male", "scholar", "historian"],
+      "compatibility_tags": ["urban", "ancient", "library", "ruins", "mystical"],
+      "rarity_weight": 0.8,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Nyx Shadowdancer",
+      "slug": "nyx-shadowdancer",
+      "description": "A half-demon assassin who walks between the mortal realm and the shadow dimension. Her blade is forged from void-steel that can cut through any defense. She is haunted by the memories of her demonic heritage and seeks redemption through mercenary work.",
+      "prompt_fragment": "a half-demon assassin with void-steel blades, walking between shadow and light",
+      "tags": ["fantasy", "demon", "assassin", "female", "shadow"],
+      "compatibility_tags": ["dark", "medieval", "underground", "mystical", "volcanic"],
+      "rarity_weight": 1.8,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Dr. Lena Okonkwo",
+      "slug": "dr-lena-okonkwo",
+      "description": "A brilliant marine biologist who leads deep-sea research expeditions. Her laboratory is a high-tech underwater facility where she studies bioluminescent creatures and ancient ocean ecosystems. She is driven by a passion to protect the world's oceans.",
+      "prompt_fragment": "a marine biologist in a high-tech underwater research facility",
+      "tags": ["modern", "aquatic", "scientist", "female", "ocean"],
+      "compatibility_tags": ["aquatic", "ocean", "coastal", "modern", "underwater"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Abyssal Trench",
+      "slug": "abyssal-trench",
+      "description": "A vast underwater canyon system where bioluminescent life forms create an alien landscape of light and shadow. Ancient ruins of a lost civilization line the trench walls, their secrets preserved in the crushing darkness. The pressure here would destroy any ordinary vessel.",
+      "prompt_fragment": "a deep-sea trench with bioluminescent creatures and ancient underwater ruins",
+      "tags": ["aquatic", "ocean", "deep-sea", "alien", "ruins"],
+      "compatibility_tags": ["aquatic", "ocean", "underwater", "dark", "mystical"],
+      "rarity_weight": 1.6,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Shifting Sands of Zar",
+      "slug": "shifting-sands-zar",
+      "description": "An endless desert where the dunes rearrange themselves overnight, making navigation nearly impossible. Hidden beneath the sand are buried cities filled with treasure and deadly traps. The heat is merciless, and water is worth more than gold.",
+      "prompt_fragment": "an endless desert with shifting dunes and buried ancient cities",
+      "tags": ["desert", "arid", "treasure", "danger", "ancient"],
+      "compatibility_tags": ["desert", "arid", "ancient", "ruins", "oasis"],
+      "rarity_weight": 1.4,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Whispering Forest",
+      "slug": "whispering-forest",
+      "description": "An ancient woodland where the trees themselves seem to speak in the wind. Magical creatures dwell in its deepest groves, and the paths shift to test the worthiness of those who enter. The air is thick with enchantment and the scent of wildflowers.",
+      "prompt_fragment": "an ancient enchanted forest with talking trees and magical creatures",
+      "tags": ["forest", "magical", "ancient", "mystical", "wilderness"],
+      "compatibility_tags": ["forest", "medieval", "mystical", "fantasy", "nature"],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "Neo-Tokyo Megacity",
+      "slug": "neo-tokyo-megacity",
+      "description": "A sprawling cyberpunk metropolis where neon signs reflect off rain-slicked streets. Towering corporate arcologies pierce the smog-choked sky, while the underground is a maze of black markets and hacker dens. Technology and humanity blur at every corner.",
+      "prompt_fragment": "a neon-lit cyberpunk megacity with towering arcologies and rain-slicked streets",
+      "tags": ["urban", "modern", "cyberpunk", "neon", "technology"],
+      "compatibility_tags": ["urban", "modern", "futuristic", "night", "crime"],
+      "rarity_weight": 1.3,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Void Station",
+      "slug": "void-station",
+      "description": "A massive orbital research station circling a dying star. Its corridors house scientists, soldiers, and refugees from a dozen conquered worlds. The view from the observation deck shows the sun's corona writhing in violent solar flares, a constant reminder of the fragility of existence.",
+      "prompt_fragment": "a massive space station orbiting a dying star with violent solar flares",
+      "tags": ["space", "sci-fi", "station", "orbital", "research"],
+      "compatibility_tags": ["space", "sci-fi", "futuristic", "alien", "station"],
+      "rarity_weight": 1.5,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Tidebreaker Coast",
+      "slug": "tidebreaker-coast",
+      "description": "A rugged coastline where massive waves crash against jagged cliffs and hidden coves. Fishing villages cling to the rock faces, their inhabitants skilled sailors who navigate treacherous waters with fearless precision. Sea monsters are said to lurk in the deeper channels.",
+      "prompt_fragment": "a rugged coastal landscape with fishing villages on cliffs and hidden coves",
+      "tags": ["coastal", "ocean", "cliffs", "fishing", "sea"],
+      "compatibility_tags": ["coastal", "ocean", "aquatic", "medieval", "nature"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "Epic Quest",
+      "slug": "epic-quest",
+      "description": "A perilous journey across dangerous lands to retrieve a powerful artifact or defeat a great evil. The quest tests the heroes' courage, wisdom, and bonds of friendship. Every step brings new challenges and revelations about their true purpose.",
+      "prompt_fragment": "a perilous quest across dangerous lands to retrieve a powerful artifact",
+      "tags": ["quest", "journey", "artifact", "heroic", "adventure"],
+      "compatibility_tags": ["fantasy", "medieval", "mountain", "forest", "underground"],
+      "rarity_weight": 1.5,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "Forbidden Romance",
+      "slug": "forbidden-romance",
+      "description": "A passionate love affair between two people from opposing sides of a bitter conflict. Their secret meetings are fraught with danger, and the weight of their divided loyalties threatens to tear them apart. Every stolen moment is both a thrill and a risk.",
+      "prompt_fragment": "a secret romance between enemies from opposing sides of a conflict",
+      "tags": ["romance", "forbidden", "love", "conflict", "secret"],
+      "compatibility_tags": ["medieval", "modern", "urban", "fantasy", "drama"],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "Survival Against Odds",
+      "slug": "survival-against-odds",
+      "description": "Characters must use every ounce of wit and resourcefulness to survive in a hostile environment. Whether facing natural disasters, hostile creatures, or their own limitations, each decision could mean life or death. Trust becomes a luxury they cannot always afford.",
+      "prompt_fragment": "a desperate struggle for survival in a hostile, unforgiving environment",
+      "tags": ["survival", "hostile", "resourceful", "danger", "endurance"],
+      "compatibility_tags": ["desert", "forest", "space", "ocean", "mountain"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "High-Stakes Heist",
+      "slug": "high-stakes-heist",
+      "description": "A meticulously planned robbery of an impossibly secure target. The crew must coordinate their skills perfectly, anticipate every security measure, and execute the plan under intense pressure. Betrayal lurks in the shadows, and the reward could change their lives forever.",
+      "prompt_fragment": "a meticulously planned high-stakes heist with precision and tension",
+      "tags": ["heist", "planning", "crime", "tension", "crew"],
+      "compatibility_tags": ["urban", "modern", "futuristic", "night", "technology"],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "Dark Investigation",
+      "slug": "dark-investigation",
+      "description": "A methodical search for truth in a web of lies and hidden agendas. Clues lead deeper into a conspiracy that threatens everything the investigator holds dear. Each revelation raises more questions than answers, and the truth may be too dangerous to uncover.",
+      "prompt_fragment": "a methodical investigation uncovering a dangerous web of lies and conspiracy",
+      "tags": ["investigation", "mystery", "conspiracy", "clues", "truth"],
+      "compatibility_tags": ["urban", "modern", "noir", "night", "crime"],
+      "rarity_weight": 0.9,
+      "is_active": true
+    },
+    {
+      "component_type": "plot_beat",
+      "name": "Inciting Incident",
+      "slug": "inciting-incident",
+      "description": "The event that shatters the protagonist's ordinary world and forces them onto an unexpected path. This moment of disruption cannot be ignored, and it sets the entire story in motion. The hero may resist, but the call to adventure is unavoidable.",
+      "prompt_fragment": "the moment that shatters the ordinary world and forces the hero onto an unexpected path",
+      "tags": ["beginning", "disruption", "call", "change", "catalyst"],
+      "compatibility_tags": ["fantasy", "modern", "sci-fi", "urban", "adventure"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "plot_beat",
+      "name": "Midpoint Reversal",
+      "slug": "midpoint-reversal",
+      "description": "A shocking twist at the story's center that changes everything the protagonist thought they knew. Victories become defeats, allies become suspects, and the stakes are raised dramatically. The hero must now fight with new understanding and greater urgency.",
+      "prompt_fragment": "a shocking mid-story twist that changes everything the hero thought they knew",
+      "tags": ["midpoint", "twist", "reversal", "stakes", "revelation"],
+      "compatibility_tags": ["fantasy", "modern", "sci-fi", "drama", "thriller"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "plot_beat",
+      "name": "Dark Night of the Soul",
+      "slug": "dark-night-of-soul",
+      "description": "The lowest point in the hero's journey, where all seems lost and despair threatens to consume them. This moment of profound crisis forces the protagonist to confront their deepest fears and doubts. It is in this darkness that true transformation begins.",
+      "prompt_fragment": "the hero's lowest point where despair forces confrontation with deepest fears",
+      "tags": ["crisis", "despair", "transformation", "darkness", "growth"],
+      "compatibility_tags": ["fantasy", "drama", "modern", "sci-fi", "emotional"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "plot_beat",
+      "name": "Climax",
+      "slug": "climax",
+      "description": "The final, decisive confrontation between the hero and their greatest challenge. Everything learned throughout the journey is put to the test in this explosive moment of truth. The outcome will determine the fate of the world and the hero's soul.",
+      "prompt_fragment": "the final explosive confrontation where everything is put to the test",
+      "tags": ["climax", "confrontation", "final", "battle", "resolution"],
+      "compatibility_tags": ["fantasy", "modern", "sci-fi", "action", "drama"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "plot_beat",
+      "name": "Resolution",
+      "slug": "resolution",
+      "description": "The aftermath of the climax, where the new normal is established and loose ends are tied. The hero returns changed, and the world reflects the impact of their journey. Peace is found, but scars remain as reminders of the trials endured.",
+      "prompt_fragment": "the aftermath where the new normal is established and the hero returns changed",
+      "tags": ["ending", "aftermath", "peace", "change", "closure"],
+      "compatibility_tags": ["fantasy", "modern", "sci-fi", "drama", "emotional"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Brave",
+      "slug": "trait-brave",
+      "description": "Faces danger with courage and determination, never backing down from a challenge. This bravery inspires allies but can sometimes border on recklessness when fear should dictate caution. True bravery is not the absence of fear but action despite it.",
+      "prompt_fragment": "a character who faces danger with unwavering courage and determination",
+      "tags": ["courage", "heroic", "fearless", "bold", "leader"],
+      "compatibility_tags": ["warrior", "quest", "battle", "heroic", "adventure"],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Deceptive",
+      "slug": "trait-deceptive",
+      "description": "Master of manipulation and hidden agendas, this character wears many masks with equal conviction. Their words are carefully chosen to mislead, and their true intentions are buried beneath layers of charm and false sincerity. Trust is a weapon they wield with precision.",
+      "prompt_fragment": "a master manipulator who wears many masks and hides true intentions behind charm",
+      "tags": ["deceptive", "manipulative", "charming", "secretive", "cunning"],
+      "compatibility_tags": ["urban", "modern", "noir", "conspiracy", "crime"],
+      "rarity_weight": 1.3,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Compassionate",
+      "slug": "trait-compassionate",
+      "description": "Deeply empathetic and driven to help those in need, this character puts others before themselves without hesitation. Their kindness is their greatest strength and also their most exploitable weakness. They see the good in everyone, even when it is hidden.",
+      "prompt_fragment": "a deeply empathetic soul driven to help others, kind to a fault",
+      "tags": ["compassionate", "empathetic", "kind", "selfless", "healer"],
+      "compatibility_tags": ["healer", "drama", "emotional", "nature", "peace"],
+      "rarity_weight": 0.9,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Reckless",
+      "slug": "trait-reckless",
+      "description": "Acts on impulse without considering consequences, charging headfirst into danger with wild abandon. This recklessness can lead to brilliant successes or catastrophic failures. They live by the motto that a life without risk is not worth living.",
+      "prompt_fragment": "an impulsive risk-taker who charges into danger with wild abandon",
+      "tags": ["reckless", "impulsive", "risky", "wild", "unpredictable"],
+      "compatibility_tags": ["mercenary", "heist", "action", "battle", "adventure"],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Wise",
+      "slug": "trait-wise",
+      "description": "Possesses deep knowledge gained through years of study and experience, offering guidance that cuts to the heart of complex problems. Their patience and measured words carry the weight of hard-earned lessons. They see patterns others miss and understand the long game.",
+      "prompt_fragment": "a patient sage whose measured words carry the weight of hard-earned wisdom",
+      "tags": ["wise", "knowledgeable", "patient", "mentor", "scholar"],
+      "compatibility_tags": ["ancient", "library", "mystical", "forest", "medieval"],
+      "rarity_weight": 0.8,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Vengeful",
+      "slug": "trait-vengeful",
+      "description": "Driven by a burning desire for retribution, this character will stop at nothing to settle a grievance. The line between justice and obsession has blurred completely, and their quest for vengeance consumes every thought and action. Nothing will stand between them and their target.",
+      "prompt_fragment": "a burning seeker of retribution whose quest for vengeance consumes all",
+      "tags": ["vengeful", "obsessive", "determined", "dark", "revenge"],
+      "compatibility_tags": ["dark", "noir", "crime", "drama", "assassin"],
+      "rarity_weight": 1.4,
+      "is_active": true
+    },
+    {
+      "component_type": "clothing",
+      "name": "Runic Battle Armor",
+      "slug": "runic-battle-armor",
+      "description": "Heavy plate armor etched with glowing protective runes forged by dwarven masters. Each rune provides a different magical defense, from fire resistance to blade deflection. The armor is heavy but its enchantments make the wearer feel weightless in combat.",
+      "prompt_fragment": "heavy dwarven plate armor etched with glowing protective runes",
+      "tags": ["armor", "runic", "heavy", "dwarven", "magical"],
+      "compatibility_tags": ["warrior", "medieval", "mountain", "battle", "forge"],
+      "rarity_weight": 1.6,
+      "is_active": true
+    },
+    {
+      "component_type": "clothing",
+      "name": "Silk Evening Gown",
+      "slug": "silk-evening-gown",
+      "description": "An elegant formal gown of flowing silk in a deep jewel tone, adorned with delicate embroidery that catches the candlelight. It is designed for grand balls and diplomatic receptions where first impressions can seal alliances or break them. The wearer commands attention with every step.",
+      "prompt_fragment": "an elegant silk evening gown with delicate embroidery, perfect for grand balls",
+      "tags": ["formal", "gown", "silk", "elegant", "ball"],
+      "compatibility_tags": ["urban", "modern", "romance", "drama", "court"],
+      "rarity_weight": 0.7,
+      "is_active": true
+    },
+    {
+      "component_type": "clothing",
+      "name": "Weathered Traveler's Rags",
+      "slug": "weathered-rags",
+      "description": "Tattered and patched clothing that tells the story of a long and hard journey. Each stain and tear represents a different hardship survived. Despite their worn appearance, these rags are practical and comfortable for a life on the road. They speak of humility and resilience.",
+      "prompt_fragment": "tattered patched clothing that tells the story of a long hard journey",
+      "tags": ["rags", "traveler", "worn", "patched", "humble"],
+      "compatibility_tags": ["nomad", "desert", "quest", "survival", "road"],
+      "rarity_weight": 0.6,
+      "is_active": true
+    },
+    {
+      "component_type": "clothing",
+      "name": "Environmental Spacesuit",
+      "slug": "environmental-spacesuit",
+      "description": "A pressurized environmental suit designed for extended missions in the vacuum of space. Its reinforced plating can withstand micrometeorite impacts, and the built-in AI assists with life support systems. The visor displays a heads-up overlay of vital stats and navigation data.",
+      "prompt_fragment": "a reinforced environmental spacesuit with AI-assisted life support and HUD visor",
+      "tags": ["spacesuit", "pressurized", "tech", "space", "futuristic"],
+      "compatibility_tags": ["space", "sci-fi", "futuristic", "station", "alien"],
+      "rarity_weight": 1.5,
+      "is_active": true
+    },
+    {
+      "component_type": "theme",
+      "name": "Redemption",
+      "slug": "theme-redemption",
+      "description": "The journey from darkness to light, where a flawed character seeks to atone for past sins. Every act of goodness is a step toward forgiveness, but the shadow of previous mistakes always looms. True redemption requires sacrifice and the courage to face one's own failures.",
+      "prompt_fragment": "a journey from darkness to light through sacrifice and atonement for past sins",
+      "tags": ["redemption", "atonement", "forgiveness", "growth", "moral"],
+      "compatibility_tags": ["dark", "drama", "emotional", "heroic", "transformation"],
+      "rarity_weight": 1.3,
+      "is_active": true
+    },
+    {
+      "component_type": "theme",
+      "name": "Forbidden Love",
+      "slug": "theme-forbidden-love",
+      "description": "A passionate connection that defies social boundaries, family feuds, or cosmic laws. The lovers must choose between duty and desire, knowing that their union could bring either salvation or destruction. Every stolen moment is both a rebellion and a vulnerability.",
+      "prompt_fragment": "a passionate love that defies boundaries, forcing choice between duty and desire",
+      "tags": ["love", "forbidden", "passion", "conflict", "desire"],
+      "compatibility_tags": ["romance", "drama", "medieval", "modern", "fantasy"],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "theme",
+      "name": "Survival",
+      "slug": "theme-survival",
+      "description": "The raw struggle to endure against overwhelming odds, whether natural, supernatural, or human. Every resource is precious, every alliance fragile, and every decision could be the last. This theme explores what people are willing to sacrifice to stay alive and what makes life worth saving.",
+      "prompt_fragment": "the raw struggle to endure against overwhelming odds, testing the will to live",
+      "tags": ["survival", "endurance", "struggle", "resilience", "desperation"],
+      "compatibility_tags": ["desert", "ocean", "space", "forest", "hostile"],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "theme",
+      "name": "Identity",
+      "slug": "theme-identity",
+      "description": "A deep exploration of who the character truly is beneath the masks they wear for the world. Questions of nature versus nurture, destiny versus choice, and authenticity versus performance drive the narrative. The hero must discover their true self before they can fulfill their purpose.",
+      "prompt_fragment": "a deep exploration of true self beneath the masks worn for the world",
+      "tags": ["identity", "self-discovery", "authenticity", "masks", "purpose"],
+      "compatibility_tags": ["modern", "urban", "drama", "emotional", "psychological"],
+      "rarity_weight": 1.2,
+      "is_active": true
+    }
+  ],
+  "constraints": [
+    {
+      "subject_tag": "aquatic",
+      "relation": "excludes",
+      "object_tag": "desert",
+      "strength": 1.0,
+      "description": "Water-based and desert environments are fundamentally incompatible."
+    },
+    {
+      "subject_tag": "aquatic",
+      "relation": "excludes",
+      "object_tag": "arid",
+      "strength": 1.0,
+      "description": "Aquatic settings cannot coexist with arid conditions."
+    },
+    {
+      "subject_tag": "aquatic",
+      "relation": "prefers",
+      "object_tag": "coastal",
+      "strength": 0.9,
+      "description": "Aquatic elements pair well with coastal environments."
+    },
+    {
+      "subject_tag": "aquatic",
+      "relation": "prefers",
+      "object_tag": "ocean",
+      "strength": 0.8,
+      "description": "Aquatic settings naturally complement ocean themes."
+    },
+    {
+      "subject_tag": "space",
+      "relation": "excludes",
+      "object_tag": "medieval",
+      "strength": 1.0,
+      "description": "Space settings are incompatible with medieval themes."
+    },
+    {
+      "subject_tag": "space",
+      "relation": "requires",
+      "object_tag": "sci-fi",
+      "strength": 1.0,
+      "description": "Space settings require sci-fi genre elements."
+    },
+    {
+      "subject_tag": "desert",
+      "relation": "avoids",
+      "object_tag": "aquatic",
+      "strength": 1.0,
+      "description": "Desert environments avoid water-based elements."
+    },
+    {
+      "subject_tag": "medieval",
+      "relation": "excludes",
+      "object_tag": "sci-fi",
+      "strength": 0.9,
+      "description": "Medieval and sci-fi genres are largely incompatible."
+    },
+    {
+      "subject_tag": "modern",
+      "relation": "avoids",
+      "object_tag": "medieval",
+      "strength": 0.6,
+      "description": "Modern settings tend to avoid medieval elements."
+    },
+    {
+      "subject_tag": "fire-magic",
+      "relation": "prefers",
+      "object_tag": "volcanic",
+      "strength": 0.7,
+      "description": "Fire magic pairs well with volcanic environments."
+    }
+  ]
+}
