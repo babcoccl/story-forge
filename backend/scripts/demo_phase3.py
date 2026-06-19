@@ -5,19 +5,14 @@ Shows plausible story setups being generated from the component database.
 Usage: python backend/scripts/demo_phase3.py
 """
 
-import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import asyncio
 
 from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import sessionmaker
-
-
-from backend.app.config import settings
 from backend.app.schemas.sampler import SampleRequest
 from backend.app.services.sampler_service import SamplerError, SamplerService
 
@@ -41,8 +36,8 @@ async def main() -> None:
     print("=== StoryForge Phase 3 Demo: Sampler Engine ===")
     print()
 
-    db_url = settings.database_url
-    engine = create_async_engine(db_url, echo=False)
+    from backend.app.db.session import AsyncSessionLocal
+    async_session = AsyncSessionLocal
 
     svc = SamplerService()
 
@@ -105,8 +100,6 @@ async def main() -> None:
         print()
 
     print("Demo complete.")
-
-    await engine.dispose()
 
 
 if __name__ == "__main__":

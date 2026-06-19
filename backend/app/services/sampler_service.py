@@ -101,9 +101,10 @@ class SamplerService:
         result = await db.execute(
             select(Component)
             .join(ComponentType)
+            .options(selectinload(Component.component_type))
             .where(Component.is_active == True)  # noqa: E712
         )
-        all_components = result.all()
+        all_components = result.scalars().all()
 
         grouped: Dict[str, List[Component]] = {}
         for comp in all_components:
