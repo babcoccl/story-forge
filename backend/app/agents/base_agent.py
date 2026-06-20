@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from uuid import UUID
 
@@ -143,10 +144,18 @@ class BaseAgent:
             user_message=user_message,
             response_format=rf,
         )
+
+        # Strip Qwen3 thinking blocks if present
+        raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+
+        # If empty after stripping, raise a clear error (triggers retry in caller)
+        if not raw:
+            raise AgentError("LLM returned empty response after stripping think tags")
+
         try:
             result = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise AgentError(f"Invalid JSON from LLM: {exc}")
+            raise AgentError(f"Invalid JSON from LLM: {exc}\nRaw response: {raw[:200]}")
         if schema and "required" in schema:
             missing = [k for k in schema["required"] if k not in result]
             if missing:

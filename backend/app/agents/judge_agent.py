@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.agents import AgentError
@@ -29,7 +31,8 @@ class JudgeAgent(BaseAgent):
         "}\n\n"
         "Approve if the combination could produce an engaging story (score >= 0.65).\n"
         "Reject if the combination is incoherent, contradictory, or dramatically flat.\n"
-        "Be generous — reward creative or unexpected combinations."
+        "Be generous — reward creative or unexpected combinations.\n"
+        "/no_think"
     )
 
     async def evaluate(
@@ -38,7 +41,10 @@ class JudgeAgent(BaseAgent):
         request: JudgeRequest,
         story_id: str | None = None,
     ) -> JudgeVerdict:
-        """Evaluate a bundle of components and return a structured verdict."""
+        """Evaluate a bundle of components and return a structured verdict.
+
+        Retries up to 3 times on AgentError (empty/transient Qwen3 responses).
+        """
 
         # Build user message
         lines: list[str] = []
@@ -52,16 +58,22 @@ class JudgeAgent(BaseAgent):
             + f"\n\n(attempt {request.attempt_number})"
         )
 
-        try:
-            result = await self.call_json(
-                db=db,
-                story_id=story_id,
-                scene_id=None,
-                user_message=user_message,
-                schema=JudgeVerdict.model_json_schema(),
-            )
-            return JudgeVerdict(**result)
-        except AgentError:
-            raise
-        except Exception as exc:
-            raise AgentError(f"Judge evaluation failed: {exc}")
+        last_error: AgentError | None = None
+        for attempt in range(1, 4):  # 3 attempts max
+            try:
+                result = await self.call_json(
+                    db=db,
+                    story_id=story_id,
+                    scene_id=None,
+                    user_message=user_message,
+                    schema=JudgeVerdict.model_json_schema(),
+                )
+                return JudgeVerdict(**result)
+            except AgentError as exc:
+                last_error = exc
+                if attempt < 3:
+                    await asyncio.sleep(1)
+            except Exception as exc:
+                raise AgentError(f"Judge evaluation failed: {exc}")
+
+        raise AgentError(f"Judge evaluation failed after 3 attempts: {last_error}")

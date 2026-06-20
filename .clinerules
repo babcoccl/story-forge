@@ -201,3 +201,8 @@ Always import and use AsyncSessionLocal from backend.app.db.session:
   from backend.app.db.session import AsyncSessionLocal
   async with AsyncSessionLocal() as db:
       ...
+
+## Qwen3 LLM Response Rules
+- Always append /no_think to system prompts for agents that require structured JSON output.
+- base_agent.call_json() must strip <think>...</think> blocks before parsing.
+- Judge and all future JSON-output agents must retry up to 3 times on AgentError.
