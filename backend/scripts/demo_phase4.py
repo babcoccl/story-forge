@@ -130,7 +130,7 @@ async def print_agent_run_stats(demo_start: datetime) -> None:
 
         # Average latency
         avg_result = await db.execute(
-            select(func.avg(AgentRun.llm_latency_ms)).where(
+            select(func.avg(AgentRun.latency_ms)).where(
                 AgentRun.agent_name == "judge",
                 AgentRun.created_at >= demo_start,
             )
@@ -139,7 +139,7 @@ async def print_agent_run_stats(demo_start: datetime) -> None:
 
         # Total tokens
         tokens_result = await db.execute(
-            select(func.sum(AgentRun.total_tokens)).where(
+            select(func.sum(AgentRun.prompt_tokens + AgentRun.completion_tokens)).where(
                 AgentRun.agent_name == "judge",
                 AgentRun.created_at >= demo_start,
             )
