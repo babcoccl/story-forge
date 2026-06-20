@@ -1,6 +1,7 @@
 import os
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve .env path relative to project root (two levels up from this file)
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -23,8 +24,9 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 4096
     llm_temperature: float = 0.8
     llm_context_window: int = 32768
+    llm_timeout: float = 120.0
     max_scene_retries: int = 3
-    max_combination_retries: int = 5
+    max_combination_retries: int = 15
     target_words_per_scene: int = 1500
     log_level: str = "INFO"
 

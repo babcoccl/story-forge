@@ -4,17 +4,22 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from uuid import UUID
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.agents import AgentError
 from backend.app.config import get_settings
-from backend.app.db.session import AsyncSessionLocal
+from backend.app.db.declarative_base import Base
 from backend.app.models.agent import AgentRun
+
+
+class AgentError(Exception):
+    """Base exception for agent failures."""
+    pass
 
 
 class BaseAgent:
@@ -70,7 +75,7 @@ class BaseAgent:
         last_error: AgentError | None = None
         for attempt in range(1, 4):  # 3 retries max
             try:
-                resp = await self._client.post("/v1/chat/completions", json=body)
+                resp = await self._client.post("/chat/completions", json=body)
                 resp.raise_for_status()
                 data = resp.json()
                 content = data["choices"][0]["message"]["content"]
@@ -138,7 +143,6 @@ class BaseAgent:
             user_message=user_message,
             response_format=rf,
         )
-        import json
         try:
             result = json.loads(raw)
         except json.JSONDecodeError as exc:

@@ -5,16 +5,7 @@ from __future__ import annotations
 from typing import List
 
 from pydantic import BaseModel, Field
-
-
-class BundleItem(BaseModel):
-    """A single component in a judged bundle (mirrors sampler output)."""
-
-    role: str
-    component_id: int
-    name: str
-    tags: List[str] = []
-    rarity_weight: float = 1.0
+from backend.app.schemas.sampler import BundleItem  # import, do not redefine
 
 
 class JudgeRequest(BaseModel):

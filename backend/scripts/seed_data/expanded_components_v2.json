@@ -1,0 +1,992 @@
+{
+  "component_types": [
+    {
+      "name": "character",
+      "display_name": "Characters",
+      "description": "Story characters with personalities, backgrounds, and roles.",
+      "is_active": true
+    },
+    {
+      "name": "setting",
+      "display_name": "Settings",
+      "description": "Story environments, locations, and worlds.",
+      "is_active": true
+    },
+    {
+      "name": "activity",
+      "display_name": "Activities",
+      "description": "Core story activities and narrative drivers.",
+      "is_active": true
+    },
+    {
+      "name": "plot_beat",
+      "display_name": "Plot Beats",
+      "description": "Structural story beats and narrative milestones.",
+      "is_active": true
+    },
+    {
+      "name": "trait",
+      "display_name": "Traits",
+      "description": "Character personality traits and attributes.",
+      "is_active": true
+    },
+    {
+      "name": "clothing",
+      "display_name": "Clothing",
+      "description": "Character attire and costume elements.",
+      "is_active": true
+    },
+    {
+      "name": "theme",
+      "display_name": "Themes",
+      "description": "Overarching story themes and motifs.",
+      "is_active": true
+    }
+  ],
+  "components": [
+    {
+      "component_type": "character",
+      "name": "Mira the Wanderer",
+      "slug": "mira-wanderer",
+      "description": "A rootless traveler who has crossed every known continent, carrying only a weathered journal and an uncanny ability to find trouble. She speaks a dozen languages and has friends \u2014 and enemies \u2014 in every port.",
+      "prompt_fragment": "a seasoned world-traveler with a weathered journal and a gift for languages",
+      "tags": [
+        "human",
+        "traveler",
+        "female",
+        "wanderer",
+        "resourceful"
+      ],
+      "compatibility_tags": [
+        "road",
+        "rural",
+        "urban",
+        "coastal",
+        "mountain"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Aldric the Innkeeper",
+      "slug": "aldric-innkeeper",
+      "description": "A broad-shouldered former soldier who now runs the most popular inn at the crossroads of three kingdoms. He knows every traveler's secret and keeps them all. His smile is warm but his eyes are sharp.",
+      "prompt_fragment": "a former soldier turned innkeeper who knows every traveler's secrets",
+      "tags": [
+        "human",
+        "male",
+        "merchant",
+        "veteran",
+        "social"
+      ],
+      "compatibility_tags": [
+        "rural",
+        "urban",
+        "road",
+        "temperate",
+        "trade"
+      ],
+      "rarity_weight": 0.8,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Seraphina Voss",
+      "slug": "seraphina-voss",
+      "description": "A sharp political strategist who has shaped the rise and fall of three governments from behind the scenes. She prefers shadows to spotlights and wields influence like a scalpel. No scandal surprises her \u2014 she probably caused it.",
+      "prompt_fragment": "a behind-the-scenes political strategist who shapes governments from the shadows",
+      "tags": [
+        "human",
+        "female",
+        "political",
+        "strategist",
+        "cunning"
+      ],
+      "compatibility_tags": [
+        "urban",
+        "court",
+        "drama",
+        "modern",
+        "conspiracy"
+      ],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Tobias Crane",
+      "slug": "tobias-crane",
+      "description": "A wiry street orphan turned master thief who learned to pick locks before he could read. His quick wit and quicker fingers have kept him alive through situations that would break harder men.",
+      "prompt_fragment": "a nimble street thief with quick wit and even quicker fingers",
+      "tags": [
+        "human",
+        "male",
+        "thief",
+        "street",
+        "agile"
+      ],
+      "compatibility_tags": [
+        "urban",
+        "crime",
+        "night",
+        "road",
+        "trade"
+      ],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Captain Rhea Stormwind",
+      "slug": "captain-rhea-stormwind",
+      "description": "A no-nonsense ship captain who has sailed every known sea and several unknown ones. Her crew would follow her into a hurricane, and have. Her reputation for delivering cargo against all odds makes her the most sought-after hire on the coast.",
+      "prompt_fragment": "a legendary ship captain whose crew would follow her into any storm",
+      "tags": [
+        "human",
+        "female",
+        "captain",
+        "sailor",
+        "leader"
+      ],
+      "compatibility_tags": [
+        "coastal",
+        "ocean",
+        "trade",
+        "adventure",
+        "nature"
+      ],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "The Old Hermit",
+      "slug": "old-hermit",
+      "description": "A reclusive sage who abandoned civilisation decades ago after a great personal tragedy. He lives alone in a remote wilderness and possesses knowledge that the rest of the world has forgotten. Visitors are rare and rarely leave unchanged.",
+      "prompt_fragment": "a reclusive sage who abandoned civilisation and guards forgotten knowledge",
+      "tags": [
+        "human",
+        "male",
+        "hermit",
+        "wise",
+        "reclusive"
+      ],
+      "compatibility_tags": [
+        "mountain",
+        "forest",
+        "rural",
+        "ancient",
+        "nature"
+      ],
+      "rarity_weight": 0.7,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Zara Ashford",
+      "slug": "zara-ashford",
+      "description": "A young journalist chasing her first major story \u2014 a corruption scandal that reaches the highest levels of power. Fearless in print but terrified in person, she is learning that truth-telling has a price.",
+      "prompt_fragment": "a fearless young journalist chasing a corruption story that reaches the top",
+      "tags": [
+        "human",
+        "female",
+        "journalist",
+        "modern",
+        "truth-seeker"
+      ],
+      "compatibility_tags": [
+        "urban",
+        "modern",
+        "conspiracy",
+        "drama",
+        "crime"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Bram the Blackwood Ranger",
+      "slug": "bram-blackwood-ranger",
+      "description": "A stoic wilderness guide who patrols the vast frontier between settled lands and the unknown. He can track any creature and read the forest like a map. He rarely speaks but when he does, people listen.",
+      "prompt_fragment": "a stoic frontier ranger who can track any creature and read the land",
+      "tags": [
+        "human",
+        "male",
+        "ranger",
+        "wilderness",
+        "tracker"
+      ],
+      "compatibility_tags": [
+        "forest",
+        "mountain",
+        "rural",
+        "nature",
+        "adventure"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Countess Isolde Vane",
+      "slug": "countess-isolde-vane",
+      "description": "A formidable noblewoman whose vast estate conceals a web of political intrigue and old debts. She is charming at dinner and ruthless in negotiation, and has outlasted four husbands and two monarchs.",
+      "prompt_fragment": "a formidable noblewoman whose charm conceals ruthless political mastery",
+      "tags": [
+        "human",
+        "female",
+        "noble",
+        "political",
+        "aristocrat"
+      ],
+      "compatibility_tags": [
+        "court",
+        "urban",
+        "drama",
+        "romance",
+        "trade"
+      ],
+      "rarity_weight": 0.9,
+      "is_active": true
+    },
+    {
+      "component_type": "character",
+      "name": "Finn the Apothecary",
+      "slug": "finn-apothecary",
+      "description": "A mild-mannered healer who runs a small shop in a market town, but whose remedies come from knowledge that is older and stranger than most people suspect. He never turns away a patient who cannot pay.",
+      "prompt_fragment": "a mild-mannered apothecary whose remedies draw on ancient and mysterious knowledge",
+      "tags": [
+        "human",
+        "male",
+        "healer",
+        "herbalist",
+        "compassionate"
+      ],
+      "compatibility_tags": [
+        "rural",
+        "urban",
+        "trade",
+        "nature",
+        "ancient"
+      ],
+      "rarity_weight": 0.8,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Crossroads Market Town",
+      "slug": "crossroads-market-town",
+      "description": "A bustling trade town at the intersection of four major roads. Merchants from across the known world converge here to buy, sell, and gossip. Every tavern is full of rumours and every alley has a deal being struck.",
+      "prompt_fragment": "a bustling crossroads market town full of merchants, rumours, and back-alley deals",
+      "tags": [
+        "urban",
+        "trade",
+        "temperate",
+        "crossroads",
+        "social"
+      ],
+      "compatibility_tags": [
+        "road",
+        "rural",
+        "trade",
+        "urban",
+        "adventure"
+      ],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Mountain Pass",
+      "slug": "mountain-pass",
+      "description": "A treacherous high-altitude route between two kingdoms, accessible only a few months a year. The narrow path clings to cliff faces above deep ravines, and in winter the storms can bury travellers in hours. Control of the pass means control of trade.",
+      "prompt_fragment": "a treacherous high-altitude mountain pass controlling the trade route between kingdoms",
+      "tags": [
+        "mountain",
+        "highland",
+        "temperate",
+        "wilderness",
+        "danger"
+      ],
+      "compatibility_tags": [
+        "mountain",
+        "nature",
+        "adventure",
+        "road",
+        "rural"
+      ],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The River Delta City",
+      "slug": "river-delta-city",
+      "description": "A wealthy city built across a maze of river channels where a great river meets the sea. Its bridges and waterways make it a natural hub for commerce, and its layered neighbourhoods reflect centuries of cultural mingling.",
+      "prompt_fragment": "a wealthy river delta city built on bridges and waterways at the edge of the sea",
+      "tags": [
+        "urban",
+        "coastal",
+        "trade",
+        "temperate",
+        "multicultural"
+      ],
+      "compatibility_tags": [
+        "coastal",
+        "urban",
+        "trade",
+        "social",
+        "drama"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Ancient Ruined Library",
+      "slug": "ancient-ruined-library",
+      "description": "The collapsed remnants of the greatest library ever built, now overgrown with vegetation and claimed by wildlife. Thousands of manuscripts survive in hidden vaults, and scholars risk life and limb to recover them.",
+      "prompt_fragment": "the overgrown ruins of an ancient library hiding thousands of surviving manuscripts",
+      "tags": [
+        "ruins",
+        "ancient",
+        "library",
+        "wilderness",
+        "knowledge"
+      ],
+      "compatibility_tags": [
+        "ancient",
+        "mystical",
+        "nature",
+        "adventure",
+        "urban"
+      ],
+      "rarity_weight": 1.3,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Frontier Outpost",
+      "slug": "frontier-outpost",
+      "description": "A rough-hewn settlement on the edge of explored territory, where settlers, soldiers, and opportunists rub shoulders. Law is loosely enforced, resources are scarce, and the wilderness beyond the walls holds unknown dangers.",
+      "prompt_fragment": "a rough frontier outpost on the edge of explored territory where law is loosely enforced",
+      "tags": [
+        "rural",
+        "frontier",
+        "wilderness",
+        "danger",
+        "temperate"
+      ],
+      "compatibility_tags": [
+        "adventure",
+        "nature",
+        "rural",
+        "road",
+        "conflict"
+      ],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Underground Cisterns",
+      "slug": "underground-cisterns",
+      "description": "A vast network of ancient water storage vaults beneath a great city, long since drained and now used by those who need to move unseen. The arched chambers echo with drips and whispers, and the maze is known only to a few.",
+      "prompt_fragment": "a network of ancient drained cisterns beneath the city used for secret movement",
+      "tags": [
+        "underground",
+        "urban",
+        "ancient",
+        "secret",
+        "dark"
+      ],
+      "compatibility_tags": [
+        "urban",
+        "crime",
+        "ancient",
+        "dark",
+        "conspiracy"
+      ],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Grand Court",
+      "slug": "grand-court",
+      "description": "The palatial seat of power for a great kingdom, where every room is a stage and every conversation a performance. Beneath the gilded ceilings and formal banquets, alliances are forged and broken over whispered words.",
+      "prompt_fragment": "a palatial royal court where alliances are forged and broken behind gilded doors",
+      "tags": [
+        "court",
+        "political",
+        "urban",
+        "noble",
+        "drama"
+      ],
+      "compatibility_tags": [
+        "court",
+        "drama",
+        "romance",
+        "political",
+        "urban"
+      ],
+      "rarity_weight": 0.9,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Volcanic Caldera",
+      "slug": "volcanic-caldera",
+      "description": "The interior of a dormant \u2014 but not dead \u2014 volcano, where heat vents glow orange and rare minerals crystallise from superheated vapour. Communities of hardy miners and fire-cultists have made their homes on the interior slopes.",
+      "prompt_fragment": "the interior of a dormant volcano where miners and fire-cultists live among heat vents",
+      "tags": [
+        "volcanic",
+        "underground",
+        "fire-magic",
+        "danger",
+        "mineral"
+      ],
+      "compatibility_tags": [
+        "fire-magic",
+        "forge",
+        "danger",
+        "underground",
+        "ancient"
+      ],
+      "rarity_weight": 1.4,
+      "is_active": true
+    },
+    {
+      "component_type": "setting",
+      "name": "The Pastoral Valley",
+      "slug": "pastoral-valley",
+      "description": "A sheltered green valley of farmsteads and orchards, cut off from wider events by surrounding hills. Life here is slow and seasonal, but the valley hides a history that its inhabitants would rather forget.",
+      "prompt_fragment": "a sheltered pastoral valley of farms and orchards that hides a troubled past",
+      "tags": [
+        "rural",
+        "pastoral",
+        "temperate",
+        "peaceful",
+        "nature"
+      ],
+      "compatibility_tags": [
+        "rural",
+        "nature",
+        "drama",
+        "adventure",
+        "road"
+      ],
+      "rarity_weight": 0.8,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "Political Intrigue",
+      "slug": "political-intrigue",
+      "description": "A dangerous game of alliances, betrayals, and hidden agendas played out in corridors of power. Every favour owed is a chain, every secret a weapon. The real battlefield is the banquet table.",
+      "prompt_fragment": "a dangerous game of alliances and betrayals in the corridors of power",
+      "tags": [
+        "political",
+        "intrigue",
+        "manipulation",
+        "power",
+        "strategy"
+      ],
+      "compatibility_tags": [
+        "court",
+        "urban",
+        "drama",
+        "modern",
+        "conspiracy"
+      ],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "Perilous Escape",
+      "slug": "perilous-escape",
+      "description": "A desperate flight from overwhelming pursuit through hostile terrain. Every choice narrows the options and the gap between hunter and hunted closes with every mistake. Only ingenuity and will can tip the odds.",
+      "prompt_fragment": "a desperate high-stakes flight from relentless pursuers through hostile terrain",
+      "tags": [
+        "escape",
+        "pursuit",
+        "danger",
+        "tension",
+        "resourceful"
+      ],
+      "compatibility_tags": [
+        "urban",
+        "wilderness",
+        "mountain",
+        "adventure",
+        "crime"
+      ],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "Unlikely Alliance",
+      "slug": "unlikely-alliance",
+      "description": "Former enemies or strangers forced together by circumstance must learn to trust each other enough to survive. Their clashing worldviews create friction, but also unexpected solutions. The partnership may outlast the crisis \u2014 or destroy it.",
+      "prompt_fragment": "former enemies forced together by crisis who must forge a fragile trust",
+      "tags": [
+        "alliance",
+        "trust",
+        "cooperation",
+        "conflict",
+        "growth"
+      ],
+      "compatibility_tags": [
+        "adventure",
+        "drama",
+        "emotional",
+        "heroic",
+        "conflict"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "Race Against Time",
+      "slug": "race-against-time",
+      "description": "A countdown to catastrophe that cannot be stopped \u2014 only delayed. Every moment spent on the wrong path is a moment lost, and the clock cares nothing for setbacks. Speed and precision must replace careful planning.",
+      "prompt_fragment": "a ticking countdown to catastrophe where every wasted moment narrows the margin",
+      "tags": [
+        "urgency",
+        "countdown",
+        "tension",
+        "stakes",
+        "speed"
+      ],
+      "compatibility_tags": [
+        "adventure",
+        "thriller",
+        "modern",
+        "drama",
+        "heroic"
+      ],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "activity",
+      "name": "Mentor's Final Test",
+      "slug": "mentors-final-test",
+      "description": "A student faces a challenge that their teacher cannot solve for them. Every lesson learned is put to use in a crucible that will either forge or break the student. The mentor watches \u2014 and waits.",
+      "prompt_fragment": "a student faces the ultimate test that their mentor can only watch them attempt",
+      "tags": [
+        "mentorship",
+        "test",
+        "growth",
+        "legacy",
+        "challenge"
+      ],
+      "compatibility_tags": [
+        "fantasy",
+        "drama",
+        "emotional",
+        "ancient",
+        "heroic"
+      ],
+      "rarity_weight": 0.9,
+      "is_active": true
+    },
+    {
+      "component_type": "plot_beat",
+      "name": "The Betrayal",
+      "slug": "the-betrayal",
+      "description": "Someone the hero trusted turns against them at the worst possible moment. The wound is as much emotional as tactical. Everything must be rebuilt from this point \u2014 alliances, plans, and the hero's faith in others.",
+      "prompt_fragment": "a trusted ally's betrayal that unravels the hero's plans at the worst moment",
+      "tags": [
+        "betrayal",
+        "loss",
+        "trust",
+        "shock",
+        "reversal"
+      ],
+      "compatibility_tags": [
+        "drama",
+        "thriller",
+        "fantasy",
+        "modern",
+        "emotional"
+      ],
+      "rarity_weight": 1.3,
+      "is_active": true
+    },
+    {
+      "component_type": "plot_beat",
+      "name": "The Hidden Truth Revealed",
+      "slug": "hidden-truth-revealed",
+      "description": "A secret that has shaped the entire story is finally exposed. Everything the characters \u2014 and reader \u2014 thought they understood shifts. Some truths cannot be unlearned, and the revelation will define what comes next.",
+      "prompt_fragment": "the story's hidden truth is finally exposed, reframing everything that came before",
+      "tags": [
+        "revelation",
+        "truth",
+        "reframing",
+        "mystery",
+        "change"
+      ],
+      "compatibility_tags": [
+        "mystery",
+        "drama",
+        "thriller",
+        "modern",
+        "fantasy"
+      ],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "plot_beat",
+      "name": "Crossing the Threshold",
+      "slug": "crossing-threshold",
+      "description": "The moment the hero commits to the journey and leaves their ordinary world behind. There is no going back now. The familiar is replaced by the unknown, and the adventure truly begins.",
+      "prompt_fragment": "the hero commits to the journey and steps past the point of no return",
+      "tags": [
+        "commitment",
+        "journey",
+        "beginning",
+        "change",
+        "adventure"
+      ],
+      "compatibility_tags": [
+        "fantasy",
+        "adventure",
+        "drama",
+        "road",
+        "heroic"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "plot_beat",
+      "name": "The Sacrifice",
+      "slug": "the-sacrifice",
+      "description": "Something precious must be given up to achieve the greater goal. The hero chooses what matters most and pays the price willingly. This act of selflessness changes both the hero and the story's meaning.",
+      "prompt_fragment": "the hero gives up something precious to achieve a goal greater than themselves",
+      "tags": [
+        "sacrifice",
+        "loss",
+        "selfless",
+        "meaning",
+        "moral"
+      ],
+      "compatibility_tags": [
+        "drama",
+        "emotional",
+        "heroic",
+        "fantasy",
+        "modern"
+      ],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Stubborn",
+      "slug": "trait-stubborn",
+      "description": "Once committed to a course of action, nothing short of catastrophe will change their mind. This resolve can carry them through impossible odds, or trap them in doomed plans long past the point of wisdom.",
+      "prompt_fragment": "immovably committed to their chosen path, for better or worse",
+      "tags": [
+        "stubborn",
+        "resolute",
+        "persistent",
+        "inflexible",
+        "strong-willed"
+      ],
+      "compatibility_tags": [
+        "conflict",
+        "drama",
+        "adventure",
+        "heroic",
+        "growth"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Curious",
+      "slug": "trait-curious",
+      "description": "Driven by an insatiable need to understand everything around them. They ask questions nobody else thinks to ask and follow threads that others leave dangling. Their curiosity is their greatest gift and their most consistent source of trouble.",
+      "prompt_fragment": "endlessly curious, always asking the question nobody else thought to ask",
+      "tags": [
+        "curious",
+        "inquisitive",
+        "intelligent",
+        "explorer",
+        "driven"
+      ],
+      "compatibility_tags": [
+        "mystery",
+        "adventure",
+        "ancient",
+        "knowledge",
+        "drama"
+      ],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Loyal",
+      "slug": "trait-loyal",
+      "description": "Their commitment to those they love is absolute and unconditional. They would walk into fire for the people they call family, chosen or otherwise. This loyalty is both their anchor and, sometimes, their vulnerability.",
+      "prompt_fragment": "unconditionally loyal to those they call family, chosen or otherwise",
+      "tags": [
+        "loyal",
+        "protective",
+        "devoted",
+        "trustworthy",
+        "emotional"
+      ],
+      "compatibility_tags": [
+        "drama",
+        "heroic",
+        "emotional",
+        "adventure",
+        "conflict"
+      ],
+      "rarity_weight": 0.9,
+      "is_active": true
+    },
+    {
+      "component_type": "trait",
+      "name": "Ambitious",
+      "slug": "trait-ambitious",
+      "description": "Driven by a burning desire to rise above their circumstances and leave a mark on the world. They are willing to work harder, sacrifice more, and endure longer than anyone else to reach their goals. Whether they remain ethical in the pursuit is the central question.",
+      "prompt_fragment": "burning with ambition to rise above circumstances and leave a mark on the world",
+      "tags": [
+        "ambitious",
+        "driven",
+        "determined",
+        "competitive",
+        "relentless"
+      ],
+      "compatibility_tags": [
+        "political",
+        "drama",
+        "urban",
+        "court",
+        "modern"
+      ],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "clothing",
+      "name": "Ranger's Cloak",
+      "slug": "rangers-cloak",
+      "description": "A long hooded cloak of mottled brown and green that blends into natural surroundings with uncanny effectiveness. Treated with oils that repel rain, the cloak has kept its wearer alive through a hundred wilderness nights.",
+      "prompt_fragment": "a weathered ranger's cloak that blends into any natural landscape",
+      "tags": [
+        "cloak",
+        "ranger",
+        "camouflage",
+        "wilderness",
+        "practical"
+      ],
+      "compatibility_tags": [
+        "forest",
+        "mountain",
+        "rural",
+        "adventure",
+        "nature"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "clothing",
+      "name": "Merchant's Fine Coat",
+      "slug": "merchants-fine-coat",
+      "description": "A well-tailored coat of good wool with discreet pockets for documents, samples, and coin. It projects prosperity and reliability without ostentation \u2014 the ideal garment for closing deals and opening doors.",
+      "prompt_fragment": "a well-tailored merchant's coat designed to open doors and close deals",
+      "tags": [
+        "coat",
+        "merchant",
+        "professional",
+        "temperate",
+        "social"
+      ],
+      "compatibility_tags": [
+        "urban",
+        "trade",
+        "road",
+        "court",
+        "social"
+      ],
+      "rarity_weight": 0.8,
+      "is_active": true
+    },
+    {
+      "component_type": "clothing",
+      "name": "Street Fighter's Leathers",
+      "slug": "street-fighters-leathers",
+      "description": "Scarred and reinforced leather armour that has absorbed a hundred blows and shows every one of them. It offers protection without restricting movement, and the wear patterns tell a story of someone who fights and survives.",
+      "prompt_fragment": "battered reinforced leathers that show every fight its wearer has survived",
+      "tags": [
+        "leather",
+        "fighter",
+        "urban",
+        "practical",
+        "worn"
+      ],
+      "compatibility_tags": [
+        "urban",
+        "crime",
+        "conflict",
+        "adventure",
+        "night"
+      ],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "clothing",
+      "name": "Scholar's Robes",
+      "slug": "scholars-robes",
+      "description": "Ink-stained robes of deep blue or grey, pockets stuffed with notes and implements. The uniform of the academic class, worn with the comfortable disregard of someone whose mind is always elsewhere.",
+      "prompt_fragment": "ink-stained scholar's robes with pockets full of notes and implements",
+      "tags": [
+        "robes",
+        "scholar",
+        "academic",
+        "ink-stained",
+        "intellectual"
+      ],
+      "compatibility_tags": [
+        "library",
+        "ancient",
+        "urban",
+        "knowledge",
+        "drama"
+      ],
+      "rarity_weight": 0.7,
+      "is_active": true
+    },
+    {
+      "component_type": "theme",
+      "name": "Power and Corruption",
+      "slug": "theme-power-corruption",
+      "description": "The exploration of how power changes those who hold it, and the systems that enable abuse. Good intentions erode under the weight of authority. The line between leader and tyrant is crossed incrementally, often without the crossing being noticed.",
+      "prompt_fragment": "how power erodes good intentions and the line between leader and tyrant is crossed",
+      "tags": [
+        "power",
+        "corruption",
+        "moral",
+        "political",
+        "darkness"
+      ],
+      "compatibility_tags": [
+        "political",
+        "drama",
+        "court",
+        "urban",
+        "modern"
+      ],
+      "rarity_weight": 1.3,
+      "is_active": true
+    },
+    {
+      "component_type": "theme",
+      "name": "Found Family",
+      "slug": "theme-found-family",
+      "description": "A group of strangers, united by circumstance and forged by hardship, who become each other's true family. Blood ties matter less than shared struggle and chosen loyalty. The bonds formed in crisis can outlast any that were inherited.",
+      "prompt_fragment": "strangers forged into family by shared hardship and chosen loyalty",
+      "tags": [
+        "family",
+        "belonging",
+        "loyalty",
+        "community",
+        "emotional"
+      ],
+      "compatibility_tags": [
+        "adventure",
+        "drama",
+        "heroic",
+        "emotional",
+        "road"
+      ],
+      "rarity_weight": 1.2,
+      "is_active": true
+    },
+    {
+      "component_type": "theme",
+      "name": "Truth vs. Loyalty",
+      "slug": "theme-truth-vs-loyalty",
+      "description": "The agonising choice between honesty and devotion, when the truth would wound or destroy those we love. Keeping a secret protects someone; telling it serves justice. There is no right answer \u2014 only the one you can live with.",
+      "prompt_fragment": "the agonising choice between truth and loyalty when honesty would wound those we love",
+      "tags": [
+        "truth",
+        "loyalty",
+        "moral",
+        "conflict",
+        "choice"
+      ],
+      "compatibility_tags": [
+        "drama",
+        "emotional",
+        "modern",
+        "political",
+        "mystery"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    },
+    {
+      "component_type": "theme",
+      "name": "Legacy and Heritage",
+      "slug": "theme-legacy-heritage",
+      "description": "The weight of what came before and the question of what we pass on. Characters grapple with inherited burdens \u2014 family names, old wounds, great deeds they must live up to or escape. Legacy can be a gift or a prison.",
+      "prompt_fragment": "the weight of inherited burdens and what we choose to pass on or leave behind",
+      "tags": [
+        "legacy",
+        "heritage",
+        "family",
+        "burden",
+        "history"
+      ],
+      "compatibility_tags": [
+        "ancient",
+        "court",
+        "drama",
+        "adventure",
+        "emotional"
+      ],
+      "rarity_weight": 1.1,
+      "is_active": true
+    },
+    {
+      "component_type": "theme",
+      "name": "The Cost of Progress",
+      "slug": "theme-cost-of-progress",
+      "description": "Every advancement has a price, and someone always pays it. Who decides which progress is worth the cost, and who gets to make that choice on behalf of everyone else? The benefits cluster at the top while the costs flow down.",
+      "prompt_fragment": "the hidden price of advancement and who pays it when progress serves the powerful",
+      "tags": [
+        "progress",
+        "cost",
+        "modern",
+        "moral",
+        "societal"
+      ],
+      "compatibility_tags": [
+        "modern",
+        "urban",
+        "political",
+        "drama",
+        "conflict"
+      ],
+      "rarity_weight": 1.0,
+      "is_active": true
+    }
+  ],
+  "constraints": []
+}

@@ -3,6 +3,7 @@
 Pure deterministic logic. No LLM calls.
 """
 
+import logging
 import random
 import secrets
 from typing import Dict, List, Tuple
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.app.config import settings
-from backend.app.models.component import Component, ComponentType, ComponentConstraint
+from backend.app.models.component import Component, ComponentConstraint, ComponentType
 from backend.app.schemas.sampler import BundleItem, SampleRequest, SampleResult
 
 
@@ -20,7 +21,7 @@ class SamplerError(Exception):
     """Raised when sampling fails after max retries."""
 
 
-# Required roles and their source component_type names.
+logger = logging.getLogger(__name__)
 # secondary_setting is optional (sampled 60% of the time).
 REQUIRED_ROLES = [
     ("protagonist", "character"),
@@ -66,7 +67,7 @@ class SamplerService:
         last_violations: List[str] = []
 
         for attempt in range(1, max_retries + 1):
-            bundle = self._weighted_draw(components_by_type)
+            bundle = self._weighted_draw(components_by_type, request.hint_avoid_tags, request.hint_require_tags)
             is_valid, violations = self._validate_hard_rules(constraints, bundle)
 
             if is_valid:
@@ -81,7 +82,28 @@ class SamplerService:
 
             last_violations = violations
 
-        # All retries exhausted
+        # All retries exhausted — attempt relaxed draw as graceful degradation
+        try:
+            relaxed_bundle = self._weighted_draw(components_by_type, request.hint_avoid_tags, request.hint_require_tags)
+            # If we got a structural bundle, return it with violations noted
+            if len(relaxed_bundle) >= len(REQUIRED_ROLES) - 1:
+                _, violations = self._validate_hard_rules(constraints, relaxed_bundle)
+                score, soft_warnings = self._score_soft_rules(constraints, relaxed_bundle)
+                logger.warning(
+                    "Sampler returning relaxed bundle after %d failed attempts. Violations: %s",
+                    max_retries, violations
+                )
+                return SampleResult(
+                    seed=seed,
+                    bundle=relaxed_bundle,
+                    constraint_violations=violations + soft_warnings,
+                    attempts=max_retries + 1,
+                    score=score,
+                )
+        except Exception:
+            # Relaxed draw also failed structurally
+            pass
+
         raise SamplerError(
             f"Failed to sample valid bundle after {max_retries} attempts. "
             f"Last violations: {last_violations}"
@@ -153,12 +175,19 @@ class SamplerService:
         return components_by_type
 
     def _weighted_draw(
-        self, components_by_type: Dict[str, List[Component]]
+        self,
+        components_by_type: Dict[str, List[Component]],
+        hint_avoid_tags: List[str] | None = None,
+        hint_require_tags: List[str] | None = None,
     ) -> List[BundleItem]:
         """Draw one component per role using rarity_weight.
 
         Ensures protagonist != antagonist.
         secondary_setting is drawn 60% of the time.
+
+        Hint adjustments:
+        - Components whose tags overlap with hint_avoid_tags: weight * 0.1
+        - Components whose tags overlap with hint_require_tags: weight * 2.0
         """
         bundle: List[BundleItem] = []
         drawn_ids: set = set()
@@ -179,7 +208,9 @@ class SamplerService:
                 if proto_id:
                     exclude_ids = {proto_id}
 
-            component = self._draw_one(pool, exclude_ids=exclude_ids)
+            component = self._draw_one(pool, exclude_ids=exclude_ids,
+                                       hint_avoid_tags=hint_avoid_tags,
+                                       hint_require_tags=hint_require_tags)
             if component is None:
                 continue
 
@@ -200,16 +231,27 @@ class SamplerService:
                     for item in bundle
                     if item.component_type == type_name
                 }
-                component = self._draw_one(pool, exclude_ids=exclude_ids)
+                component = self._draw_one(pool, exclude_ids=exclude_ids,
+                                           hint_avoid_tags=hint_avoid_tags,
+                                           hint_require_tags=hint_require_tags)
                 if component is not None:
                     bundle.append(self._to_bundle_item(component, role))
 
         return bundle
 
     def _draw_one(
-        self, pool: List[Component], exclude_ids: set | None = None
+        self,
+        pool: List[Component],
+        exclude_ids: set | None = None,
+        hint_avoid_tags: List[str] | None = None,
+        hint_require_tags: List[str] | None = None,
     ) -> Component | None:
-        """Draw a single component using rarity_weight for weighted sampling."""
+        """Draw a single component using rarity_weight for weighted sampling.
+
+        Applies hint adjustments:
+        - avoid overlap: weight * 0.1
+        - require overlap: weight * 2.0
+        """
         if exclude_ids:
             pool = [c for c in pool if c.id not in exclude_ids]
 
@@ -217,6 +259,22 @@ class SamplerService:
             return None
 
         weights = [c.rarity_weight for c in pool]
+
+        # Apply hint adjustments (do not mutate ORM objects)
+        if hint_avoid_tags:
+            avoid_set = set(hint_avoid_tags)
+            for i, comp in enumerate(pool):
+                comp_tags = set(comp.tags) if comp.tags else set()
+                if comp_tags & avoid_set:
+                    weights[i] *= 0.1
+
+        if hint_require_tags:
+            require_set = set(hint_require_tags)
+            for i, comp in enumerate(pool):
+                comp_tags = set(comp.tags) if comp.tags else set()
+                if comp_tags & require_set:
+                    weights[i] *= 2.0
+
         return random.choices(population=pool, weights=weights, k=1)[0]
 
     def _validate_hard_rules(
@@ -313,6 +371,14 @@ class SamplerService:
             description=component.description or "",
             prompt_fragment=component.prompt_fragment,
         )
+
+    async def health_check(self, db: AsyncSession) -> dict:
+        """Report component pool size per type. Useful for detecting thin-data conditions."""
+        components_by_type = await self._load_active_components(db)
+        return {
+            ctype: len(items)
+            for ctype, items in components_by_type.items()
+        }
 
     @staticmethod
     def _init_seed(seed: str | None) -> str:

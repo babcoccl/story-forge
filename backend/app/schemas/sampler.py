@@ -13,6 +13,8 @@ class SampleRequest(BaseModel):
     seed: str | None = None
     overrides: dict[str, str] = {}
     target_word_count: int = 15000
+    hint_avoid_tags: list[str] = []
+    hint_require_tags: list[str] = []
 
 
 class BundleItem(BaseModel):
