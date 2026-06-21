@@ -1,4 +1,4 @@
-"""StoryService — orchestrates story creation via Reroll + Planner pipeline.
+"""StoryService — orchestrates story creation via Reroll + Planner + SceneWriter pipeline.
 
 Responsible for:
 1. Creating Story records
@@ -6,8 +6,11 @@ Responsible for:
 3. Linking components to the story
 4. Calling PlannerAgent to generate structured plan
 5. Creating StoryChapter and StoryScene records from the plan
+6. Calling SceneWriterAgent to write prose for each scene
+7. Assembling chapter content from scene prose
+8. Updating Story with final word counts and status="assembled"
 
-See SPEC_PHASE_5.md for full specification.
+See SPEC_PHASE_6.md for full specification.
 """
 
 from __future__ import annotations
@@ -23,7 +26,9 @@ from backend.app.agents.planner_agent import PlannerAgent
 from backend.app.models.story import Story, StoryChapter, StoryComponentLink, StoryScene
 from backend.app.schemas.sampler import BundleItem, SampleRequest
 from backend.app.schemas.story import StoryCreateRequest, StoryPlan
+from backend.app.services.chapter_service import ChapterService
 from backend.app.services.reroll_service import RerollService
+from backend.app.services.scene_service import SceneService
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +36,17 @@ logger = logging.getLogger(__name__)
 class StoryService:
     """Service layer for story creation and management.
 
-    Orchestrates the RerollService (component sampling + judge approval)
-    and PlannerAgent (structured story plan generation) to produce a
-    complete story record ready for Phase 6 scene writing.
+    Orchestrates the RerollService (component sampling + judge approval),
+    PlannerAgent (structured story plan generation), SceneWriterAgent
+    (per-scene prose generation), and ChapterService (chapter assembly)
+    to produce a complete assembled story record.
     """
 
     def __init__(self) -> None:
         self._reroll = RerollService()
         self._planner = PlannerAgent()
+        self._scene_service = SceneService()
+        self._chapter_service = ChapterService()
 
     # ------------------------------------------------------------------
     # Public API
@@ -58,6 +66,8 @@ class StoryService:
         4. Call PlannerAgent.plan()
         5. Create StoryChapter + StoryScene records
         6. Update Story with plan data (status="writing")
+        7. Call SceneService.write_all_scenes()
+        8. Call ChapterService.assemble_chapters()
 
         Parameters
         ----------
@@ -186,6 +196,17 @@ class StoryService:
         await self._create_chapters_and_scenes(db, story.id, plan)
 
         await db.commit()
+
+        # Step 7: Write scene prose via SceneWriterAgent
+        logger.info("Starting scene writing for story %s", story.id)
+        await self._scene_service.write_all_scenes(db, story, plan)
+
+        # Step 8: Assemble chapter content
+        logger.info("Assembling chapters for story %s", story.id)
+        await self._chapter_service.assemble_chapters(db, story)
+
+        # Reload story to reflect final status from assembly
+        await db.refresh(story)
         return story
 
     async def _create_component_links(

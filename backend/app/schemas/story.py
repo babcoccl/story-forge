@@ -155,3 +155,41 @@ class StoryResponse(BaseModel):
         ..., description="Computed from sum of scenes per chapter"
     )
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Scene Writer Schemas (Phase 6)
+# ---------------------------------------------------------------------------
+
+class SceneContext(BaseModel):
+    """Input context passed to SceneWriterAgent for a single scene.
+
+    Assembled by SceneService from StoryScene ORM data, ChapterPlan data,
+    and the story_bible extracted from Story.story_bible.
+    """
+
+    scene_id: UUID
+    chapter_number: int
+    chapter_title: str
+    scene_number: int
+    beat: str
+    goal: str
+    conflict: str
+    outcome: str
+    setting_note: str
+    word_count_target: int
+    protagonist_name: str
+    protagonist_description: str
+    antagonist_name: str
+    antagonist_description: str
+    tone: str
+    pacing_notes: str
+
+
+class SceneOutput(BaseModel):
+    """Output returned by SceneWriterAgent after writing a single scene."""
+
+    scene_id: UUID
+    prose: str
+    actual_word_count: int
+    target_word_count: int
