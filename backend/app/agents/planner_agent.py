@@ -129,7 +129,6 @@ class PlannerAgent(BaseAgent):
             "- Ground every scene in the provided setting components\n\n"
             "Respond with a JSON object matching the StoryPlan schema exactly.\n"
             "All fields are required.\n\n"
-            "/no_think"
         ).format(chapter_count=chapter_count)
 
     @staticmethod
@@ -204,5 +203,6 @@ class PlannerAgent(BaseAgent):
         lines.append(f"  Chapter count     : {chapter_count}")
         lines.append("  Scenes per chapter: 3-5")
         lines.append(f"  Words per scene   : ~{words_per_scene} (approximate)")
-
+        lines.append("")
+        lines.append("/no_think")
         return "\n".join(lines)

@@ -206,3 +206,25 @@ Always import and use AsyncSessionLocal from backend.app.db.session:
 - Always append /no_think to system prompts for agents that require structured JSON output.
 - base_agent.call_json() must strip <think>...</think> blocks before parsing.
 - Judge and all future JSON-output agents must retry up to 3 times on AgentError.
+
+## Validation & Testing Rules
+
+### LLM-dependent tests MUST NOT be run by Cline
+Any validate_phaseN.py check that calls an agent (PlannerAgent, JudgeAgent,
+RerollService, StoryService.create_story, or any method that calls self.call_json)
+must be marked with:
+  # MANUAL — requires LLM, run by developer after Cline completes
+
+Cline must skip these checks entirely. Do not attempt to execute them.
+
+### What Cline CAN run autonomously:
+- Import checks (no LLM involved)
+- Schema instantiation checks (Pydantic only)
+- DB read/write checks that do not call any agent
+- API route checks using httpx with mocked services
+- ruff lint
+
+### What Cline must NOT run:
+- Any script that calls AsyncSessionLocal + an agent method
+- demo_phaseN.py scripts (always LLM-dependent)
+- Any subprocess that starts the FastAPI server
