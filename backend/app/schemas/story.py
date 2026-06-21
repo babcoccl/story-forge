@@ -47,16 +47,16 @@ class StoryPlan(BaseModel):
 
     title: str = Field(..., description="Compelling story title")
     logline: str = Field(..., description="One-sentence premise")
-    synopsis: str = Field(..., description="3-5 sentence full synopsis")
+    synopsis: str | None = Field(None, description="3-5 sentence full synopsis. Optional - derived from logline if absent.") # optional — derive from chapters if empty
     themes: list[str] = Field(
-        ..., description="Active theme tags drawn from component bundle"
-    )
-    chapter_count: int = Field(..., description="Number of chapters in the plan")
+        default_factory=list, description="Active theme tags. Optional - derived from component bundle if absent."
+    ) # optional — populated from bundle tags if empty
+    chapter_count: int | None = Field(None, description="Number of chapters in the plan. Optional - derived from bundle if absent.") # optional — computed from len(chapters) if 0
     chapters: list[ChapterPlan] = Field(..., description="List of chapter plans")
     story_bible: dict[str, Any] = Field(
         ...,
         description="Keys: characters, world_state, tone, pacing_notes",
-    )
+    ) # optional — empty dict if omitted
 
 
 # ---------------------------------------------------------------------------

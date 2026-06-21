@@ -126,9 +126,13 @@ class PlannerAgent(BaseAgent):
             "- The story_bible must capture character states, world details, and tone\n"
             "- Distribute word count evenly across scenes to reach target_word_count total\n"
             "- Use the protagonist and antagonist to drive the central conflict\n"
-            "- Ground every scene in the provided setting components\n\n"
+            "- Ground every scene in the provided setting components\n"
+            "- Keep scene goals, conflicts, and outcomes to 1 sentence each\n"
+            "- Keep chapter summaries to 2 sentences maximum\n"
+            "- story_bible should have 3 keys only: tone, pacing_notes, character_states\n"
             "Respond with a JSON object matching the StoryPlan schema exactly.\n"
-            "All fields are required.\n\n"
+            "Respond with a JSON object. Include title, logline, chapters, and story_bible.\n"
+            "synopsis, themes, and chapter_count are optional — omit if you are uncertain.\n\n"
         ).format(chapter_count=chapter_count)
 
     @staticmethod

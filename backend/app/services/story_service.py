@@ -164,6 +164,19 @@ class StoryService:
 
         # Step 5: Update story with plan data
         story.title = plan.title
+        if plan.synopsis is None:
+            fallback_synopsis = (
+                f"{plan.logline} The story unfolds across {len(plan.chapters)} chapters."
+            )
+            plan = plan.model_copy(update={"synopsis": fallback_synopsis})
+        if plan.chapter_count is None:
+            plan = plan.model_copy(update={"chapter_count": len(plan.chapters)})
+        if plan.themes is None:
+            tag_pool: list[str] = []
+            for item in bundle:
+                if item.tags:
+                    tag_pool.extend(item.tags[:2])  # cap per component
+            plan = plan.model_copy(update={"themes": list(dict.fromkeys(tag_pool))[:6]})
         story.synopsis = plan.synopsis
         story.generation_seed = sample_result.seed
         story.story_bible = plan.story_bible

@@ -103,6 +103,18 @@ class BaseAgent:
                 await db.commit()
                 return content
 
+            except httpx.ReadTimeout:
+                retry_count += 1
+                logger.error(
+                    "LLM ReadTimeout on attempt %d — increase LLM_TIMEOUT in .env (currently %.0fs)",
+                    attempt,
+                    self._settings.llm_timeout,
+                )
+                last_error = AgentError(
+                    f"LLM timed out after {self._settings.llm_timeout}s. "
+                    "Set LLM_TIMEOUT >= 300 in .env."
+                )
+                break  # No point retrying a timeout — it's a config issue, not a transient error
             except httpx.HTTPError as exc:
                 retry_count += 1
                 last_error = AgentError(f"HTTP error on attempt {attempt}: {exc}")
