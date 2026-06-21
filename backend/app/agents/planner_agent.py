@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.agents.base_agent import AgentError, BaseAgent
@@ -88,7 +89,13 @@ class PlannerAgent(BaseAgent):
                     user_message,
                     schema=StoryPlan.model_json_schema(),
                 )
-                plan = StoryPlan(**result)
+                try:
+                    plan = StoryPlan(**result)
+                except ValidationError as ve:
+                    raise AgentError(
+                        f"StoryPlan validation failed on attempt {attempt} "
+                        f"({ve.error_count()} errors): {ve}"
+                    ) from ve
                 logger.info(
                     "PlannerAgent.plan succeeded on attempt %d  "
                     "(chapters=%d, scenes=%d)",
@@ -122,7 +129,9 @@ class PlannerAgent(BaseAgent):
             "- Have a compelling title and single-sentence logline\n"
             "- Contain exactly {chapter_count} chapters\n"
             "- Each chapter must have 3-5 scenes\n"
-            "- Each scene must have a clear goal, conflict, and outcome\n"
+            "- Each scene must use EXACTLY these JSON keys: "
+            "scene_number, goal, conflict, outcome, setting_note, word_count_target\n"
+            "  Do NOT use setting_note_reference, word_count_allocation, or any other variant.\n"
             "- The story_bible must capture character states, world details, and tone\n"
             "- Distribute word count evenly across scenes to reach target_word_count total\n"
             "- Use the protagonist and antagonist to drive the central conflict\n"
@@ -207,6 +216,11 @@ class PlannerAgent(BaseAgent):
         lines.append(f"  Chapter count     : {chapter_count}")
         lines.append("  Scenes per chapter: 3-5")
         lines.append(f"  Words per scene   : ~{words_per_scene} (approximate)")
+        lines.append("")
+        lines.append(
+            "Scene JSON keys (exact): "
+            "scene_number, goal, conflict, outcome, setting_note, word_count_target"
+        )
         lines.append("")
         lines.append("/no_think")
         return "\n".join(lines)

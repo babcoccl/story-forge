@@ -5,17 +5,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import time
 from uuid import UUID
 
 import httpx
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.config import get_settings
-from backend.app.db.declarative_base import Base
 from backend.app.models.agent import AgentRun
+
+logger = logging.getLogger(__name__)
 
 
 class AgentError(Exception):
@@ -106,15 +107,16 @@ class BaseAgent:
             except httpx.ReadTimeout:
                 retry_count += 1
                 logger.error(
-                    "LLM ReadTimeout on attempt %d — increase LLM_TIMEOUT in .env (currently %.0fs)",
+                    "LLM ReadTimeout on attempt %d — "
+                    "increase LLM_TIMEOUT in .env (currently %.0fs)",
                     attempt,
                     self._settings.llm_timeout,
                 )
                 last_error = AgentError(
                     f"LLM timed out after {self._settings.llm_timeout}s. "
-                    "Set LLM_TIMEOUT >= 300 in .env."
+                    "Set LLM_TIMEOUT >= 300 in .env and retry."
                 )
-                break  # No point retrying a timeout — it's a config issue, not a transient error
+                break  # Timeout is a config issue — do not retry, surface immediately
             except httpx.HTTPError as exc:
                 retry_count += 1
                 last_error = AgentError(f"HTTP error on attempt {attempt}: {exc}")
