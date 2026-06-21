@@ -148,6 +148,9 @@ class BaseAgent:
         # Strip Qwen3 thinking blocks if present
         raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
 
+        # Strip markdown code fences (```json ... ``` or ``` ... ```)
+        raw = re.sub(r"^```(?:json)?\s*\n(.*?)\n```\s*$", r"\1", raw, flags=re.DOTALL).strip()
+
         # If empty after stripping, raise a clear error (triggers retry in caller)
         if not raw:
             raise AgentError("LLM returned empty response after stripping think tags")
