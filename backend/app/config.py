@@ -1,3 +1,5 @@
+"""Application configuration loaded from .env file."""
+
 import os
 from functools import lru_cache
 
@@ -29,6 +31,15 @@ class Settings(BaseSettings):
     max_combination_retries: int = 15
     target_words_per_scene: int = 1500
     log_level: str = "INFO"
+
+    # CORS — comma-separated list of allowed origins.
+    # Default permits the Next.js dev server and localhost variants.
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse cors_origins string into a list."""
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 @lru_cache
