@@ -69,3 +69,48 @@ export interface SseErrorPayload {
   story_id: string;
   error_message: string;
 }
+
+// ---------------------------------------------------------------------------
+// Chapter Reader types (Phase 8c)
+// ---------------------------------------------------------------------------
+
+/** Mirrors backend/app/schemas/story.py SceneResponse */
+export interface SceneResponse {
+  id: string;
+  scene_number: number;
+  beat: string | null;
+  content: string | null;
+  word_count: number | null;
+  status: string;
+  continuity_notes: string | null;
+  revision_count: number;
+}
+
+/** Mirrors backend/app/schemas/story.py ChapterResponse */
+export interface ChapterResponse {
+  id: string;
+  chapter_number: number;
+  title: string | null;
+  outline: string | null;
+  content: string | null;
+  word_count: number | null;
+  status: string;
+  scenes: SceneResponse[];
+}
+
+/** Mirrors backend/app/schemas/story.py ChapterListResponse */
+export interface ChapterListResponse {
+  story_id: string;
+  chapter_count: number;
+  chapters: ChapterResponse[];
+}
+
+/** Lightweight status check for polling during generation */
+export interface StoryStatusResponse {
+  id: string;
+  status: StoryStatus;
+  title: string | null;
+  actual_word_count: number | null;
+  error_message: string | null;
+  chapter_statuses: string[];
+}

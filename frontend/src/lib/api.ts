@@ -6,7 +6,12 @@
  * without code changes.
  */
 
-import type { StoryCreateRequest, StoryResponse } from "./types";
+import type {
+  ChapterListResponse,
+  StoryCreateRequest,
+  StoryResponse,
+  StoryStatusResponse,
+} from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -48,4 +53,26 @@ export async function getStory(storyId: string): Promise<StoryResponse> {
  */
 export function getStreamUrl(storyId: string): string {
   return `${API_BASE}/stories/${storyId}/stream`;
+}
+
+/**
+ * GET /api/v1/stories/{storyId}/chapters/ — fetch all chapters with scenes.
+ */
+export async function getChapters(storyId: string): Promise<ChapterListResponse> {
+  const res = await fetch(`${API_BASE}/stories/${storyId}/chapters/`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch chapters (${res.status})`);
+  }
+  return res.json() as Promise<ChapterListResponse>;
+}
+
+/**
+ * GET /api/v1/stories/{storyId}/status — lightweight status check.
+ */
+export async function getStoryStatus(storyId: string): Promise<StoryStatusResponse> {
+  const res = await fetch(`${API_BASE}/stories/${storyId}/status`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch status (${res.status})`);
+  }
+  return res.json() as Promise<StoryStatusResponse>;
 }

@@ -12,13 +12,14 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { createStory, getStreamUrl } from "@/lib/api";
+import { createStory, getStreamUrl, getStoryStatus } from "@/lib/api";
 import type {
   SseAssembledPayload,
   SseChapterCompletePayload,
   SseErrorPayload,
   SseSceneCompletePayload,
   StoryMode,
+  StoryStatus,
 } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,28 @@ function StatusBadge({ count, label }: { count: number; label: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Pipeline status badge
+// ---------------------------------------------------------------------------
+
+const STATUS_COLORS: Record<StoryStatus, string> = {
+  planning: "bg-yellow-100 text-yellow-800",
+  writing: "bg-blue-100 text-blue-800",
+  reviewing: "bg-purple-100 text-purple-800",
+  assembled: "bg-green-100 text-green-800",
+  complete: "bg-green-100 text-green-800",
+  failed: "bg-red-100 text-red-800",
+  pending: "bg-gray-100 text-gray-800",
+};
+
+function StatusBadgeComponent({ status }: { status: StoryStatus }) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${STATUS_COLORS[status] ?? STATUS_COLORS.pending}`}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
 
@@ -72,6 +95,9 @@ export default function GeneratePage() {
   const [sceneEvents, setSceneEvents] = useState<SceneEvent[]>([]);
   const [completedChapters, setCompletedChapters] = useState<number[]>([]);
   const [result, setResult] = useState<GenerationResult | null>(null);
+
+  // Pipeline status polling
+  const [writingStatus, setWritingStatus] = useState<StoryStatus | null>(null);
 
   // SSE ref — held outside state to allow cleanup
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -156,6 +182,27 @@ export default function GeneratePage() {
   }, [pageState, storyId]);
 
   // ---------------------------------------------------------------------------
+  // Status polling — refreshes DB status every 10s during generation
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (pageState !== "generating" || storyId === null) return;
+
+    const poll = async () => {
+      try {
+        const status = await getStoryStatus(storyId);
+        setWritingStatus(status.status);
+      } catch {
+        // Ignore polling failures — SSE is the primary signal
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 10_000);
+    return () => clearInterval(interval);
+  }, [pageState, storyId]);
+
+  // ---------------------------------------------------------------------------
   // Handlers
   // ---------------------------------------------------------------------------
 
@@ -166,6 +213,7 @@ export default function GeneratePage() {
     setSceneEvents([]);
     setCompletedChapters([]);
     setResult(null);
+    setWritingStatus(null);
 
     try {
       const story = await createStory({
@@ -188,6 +236,7 @@ export default function GeneratePage() {
     setCompletedChapters([]);
     setResult(null);
     setErrorMessage(null);
+    setWritingStatus(null);
   }
 
   // ---------------------------------------------------------------------------
@@ -307,6 +356,7 @@ export default function GeneratePage() {
             <span className="text-sm font-medium text-gray-700">
               Generating…
             </span>
+            {writingStatus && <StatusBadgeComponent status={writingStatus} />}
           </div>
 
           {/* Stats badges */}
@@ -346,6 +396,20 @@ export default function GeneratePage() {
             <p className="text-sm text-gray-500">
               Waiting for the planner to finish… (this takes 1–3 minutes)
             </p>
+          )}
+
+          {/* Live preview link */}
+          {storyId && (
+            <a
+              href={`/stories/${storyId}`}
+              className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-500"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              View Story (live)
+            </a>
           )}
         </div>
       )}
