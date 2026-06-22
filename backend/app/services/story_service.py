@@ -10,7 +10,10 @@ Responsible for:
 7. Assembling chapter content from scene prose
 8. Updating Story with final word counts and status="assembled"
 
-See SPEC_PHASE_6.md for full specification.
+Phase 7 additions:
+- reroll_story(): re-runs the full pipeline on an existing story record.
+
+See SPEC_PHASE_6.md and SPEC_PHASE_7.md for full specification.
 """
 
 from __future__ import annotations
@@ -18,14 +21,14 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.app.agents.planner_agent import PlannerAgent
 from backend.app.models.story import Story, StoryChapter, StoryComponentLink, StoryScene
 from backend.app.schemas.sampler import BundleItem, SampleRequest
-from backend.app.schemas.story import StoryCreateRequest, StoryPlan
+from backend.app.schemas.story import RerollRequest, StoryCreateRequest, StoryPlan
 from backend.app.services.chapter_service import ChapterService
 from backend.app.services.reroll_service import RerollService
 from backend.app.services.scene_service import SceneService
@@ -101,6 +104,68 @@ class StoryService:
 
         try:
             return await self._execute_pipeline(db, story, request)
+        except Exception as exc:
+            await self._mark_failed(db, story, str(exc))
+            raise
+
+    async def reroll_story(
+        self,
+        db: AsyncSession,
+        story: Story,
+        request: RerollRequest,
+    ) -> Story:
+        """Re-run the full generation pipeline on an existing story record.
+
+        Clears all existing pipeline data (component links, chapters, scenes)
+        and re-runs the full pipeline with a new component bundle sample.
+        The story record's id, mode, and created_at are preserved.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Active database session.
+        story : Story
+            The existing Story ORM object to reroll.
+        request : RerollRequest
+            Optional overrides for seed, component overrides, and target_word_count.
+
+        Returns
+        -------
+        Story
+            The updated Story ORM object with newly assembled content.
+
+        Raises
+        ------
+        Exception
+            Any exception from the pipeline. On failure, story.status is
+            set to "failed" with error_message populated.
+        """
+        target_word_count = request.target_word_count or story.target_word_count
+
+        # Clear existing pipeline data
+        await self._delete_existing_pipeline_data(db, story.id)
+
+        # Reset story state
+        story.status = "planning"
+        story.error_message = None
+        story.title = None
+        story.synopsis = None
+        story.generation_seed = None
+        story.story_bible = None
+        story.actual_word_count = None
+        story.target_word_count = target_word_count
+        await db.commit()
+
+        # Build a StoryCreateRequest-compatible object for the pipeline
+        create_request = StoryCreateRequest(
+            mode=story.mode,
+            seed=request.seed,
+            overrides=request.overrides,
+            target_word_count=target_word_count,
+        )
+
+        try:
+            return await self._execute_pipeline(db, story, create_request)
         except Exception as exc:
             await self._mark_failed(db, story, str(exc))
             raise
@@ -215,6 +280,45 @@ class StoryService:
             )
         )
         return result.scalar_one()
+
+    async def _delete_existing_pipeline_data(
+        self,
+        db: AsyncSession,
+        story_id: UUID,
+    ) -> None:
+        """Delete all pipeline-generated records for a story before reroll.
+
+        Deletes in dependency order:
+        1. StoryScene (FK → story_chapters.id)
+        2. StoryChapter (FK → stories.id)
+        3. StoryComponentLink (FK → stories.id)
+
+        Does not delete the Story record itself.
+        """
+        # Load chapter IDs first so we can delete their scenes
+        chapter_result = await db.execute(
+            select(StoryChapter.id).where(StoryChapter.story_id == story_id)
+        )
+        chapter_ids = [row[0] for row in chapter_result.fetchall()]
+
+        if chapter_ids:
+            await db.execute(
+                delete(StoryScene).where(StoryScene.chapter_id.in_(chapter_ids))
+            )
+
+        await db.execute(
+            delete(StoryChapter).where(StoryChapter.story_id == story_id)
+        )
+        await db.execute(
+            delete(StoryComponentLink).where(StoryComponentLink.story_id == story_id)
+        )
+        await db.commit()
+
+        logger.info(
+            "Deleted existing pipeline data for story %s (%d chapters)",
+            story_id,
+            len(chapter_ids),
+        )
 
     async def _create_component_links(
         self,

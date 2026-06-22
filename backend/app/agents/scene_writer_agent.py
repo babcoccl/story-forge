@@ -71,10 +71,7 @@ class SceneWriterAgent(BaseAgent):
             If all 3 attempts fail.
         """
         user_message = self._build_user_message(context)
-        max_tokens = min(
-            self._settings.llm_max_tokens,
-            context.word_count_target * 2,
-        )
+        max_tokens = min( self._settings.llm_max_tokens, 32192 )
 
         max_attempts = 3
         last_error: Exception | None = None

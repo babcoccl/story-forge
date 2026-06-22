@@ -6,12 +6,12 @@ that the FastAPI application mounts at `/api/v1`.
 
 from fastapi import APIRouter
 
-from backend.app.api.v1 import stories
+from backend.app.api.v1 import chapters, stories
 
 v1_router = APIRouter()
 
-# Phase 5: Stories API
+# Phase 5/7: Stories API (create, get, list, reroll, status)
 v1_router.include_router(stories.router)
 
-# TODO Phase 9: include component_router
-# TODO Phase 9: include run_router
+# Phase 7: Chapters API (list chapters, get chapter, get scene)
+v1_router.include_router(chapters.router)

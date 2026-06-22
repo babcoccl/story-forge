@@ -4,6 +4,10 @@ Schemas:
   - ScenePlan, ChapterPlan, StoryPlan  (LLM planner output)
   - StoryCreateRequest                 (API input)
   - StoryResponse                      (API output)
+  - ChapterResponse, SceneResponse     (Phase 7 chapter/scene API)
+  - StoryStatusResponse                (Phase 7 status polling)
+  - StoryListItem, StoryListResponse   (Phase 7 story list)
+  - RerollRequest                      (Phase 7 reroll API)
 """
 
 from datetime import datetime
@@ -53,7 +57,7 @@ class ScenePlan(BaseModel):
         canonical field names.
         """
         if isinstance(data, dict):
-            # setting_note variants — add new variants here as discovered
+            # setting_note variants -- add new variants here as discovered
             for alt in (
                 "setting_note_reference",
                 "setting_note_desc",
@@ -63,7 +67,7 @@ class ScenePlan(BaseModel):
                 if alt in data and "setting_note" not in data:
                     data["setting_note"] = data[alt]
 
-            # word_count_target variants — add new variants here as discovered
+            # word_count_target variants -- add new variants here as discovered
             for alt in (
                 "word_count_allocation",
                 "word_count",
@@ -80,10 +84,10 @@ class ScenePlan(BaseModel):
     def apply_defaults(self) -> "ScenePlan":
         """Apply fallback defaults if fields are still None after alias normalization.
 
-        setting_note defaults to 'Primary setting' — a safe placeholder that
+        setting_note defaults to 'Primary setting' -- a safe placeholder that
         SceneWriterAgent can use without error.
 
-        word_count_target defaults to 1250 — the value the LLM was already
+        word_count_target defaults to 1250 -- the value the LLM was already
         computing (target_word_count / scenes_total at 15000 / 12 scenes).
         """
         if self.setting_note is None:
@@ -131,16 +135,16 @@ class StoryPlan(BaseModel):
 
     title: str = Field(..., description="Compelling story title")
     logline: str = Field(..., description="One-sentence premise")
-    synopsis: str | None = Field(None, description="3-5 sentence full synopsis. Optional - derived from logline if absent.") # optional — derive from chapters if empty
+    synopsis: str | None = Field(None, description="3-5 sentence full synopsis. Optional - derived from logline if absent.")
     themes: list[str] = Field(
         default_factory=list, description="Active theme tags. Optional - derived from component bundle if absent."
-    ) # optional — populated from bundle tags if empty
-    chapter_count: int | None = Field(None, description="Number of chapters in the plan. Optional - derived from bundle if absent.") # optional — computed from len(chapters) if 0
+    )
+    chapter_count: int | None = Field(None, description="Number of chapters in the plan. Optional - derived from bundle if absent.")
     chapters: list[ChapterPlan] = Field(..., description="List of chapter plans")
     story_bible: dict[str, Any] = Field(
         ...,
         description="Keys: characters, world_state, tone, pacing_notes",
-    ) # optional — empty dict if omitted
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -215,3 +219,126 @@ class SceneOutput(BaseModel):
     prose: str
     actual_word_count: int
     target_word_count: int
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: Chapter / Scene Response Schemas
+# ---------------------------------------------------------------------------
+
+class SceneResponse(BaseModel):
+    """Response schema for a single story scene."""
+
+    model_config = {"from_attributes": True}
+
+    id: UUID
+    scene_number: int
+    beat: str | None = None
+    content: str | None = None
+    word_count: int | None = None
+    status: str
+    continuity_notes: str | None = None
+    revision_count: int = 0
+
+
+class ChapterResponse(BaseModel):
+    """Response schema for a single story chapter, with nested scenes."""
+
+    model_config = {"from_attributes": True}
+
+    id: UUID
+    chapter_number: int
+    title: str | None = None
+    outline: str | None = None
+    content: str | None = None
+    word_count: int | None = None
+    status: str
+    scenes: list[SceneResponse] = Field(default_factory=list)
+
+
+class ChapterListResponse(BaseModel):
+    """Response schema for the chapter list endpoint."""
+
+    story_id: UUID
+    chapter_count: int
+    chapters: list[ChapterResponse]
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: Status Polling Schemas
+# ---------------------------------------------------------------------------
+
+class SceneStatusItem(BaseModel):
+    """Lightweight scene status for polling."""
+
+    scene_number: int
+    status: str
+    word_count: int | None = None
+
+
+class ChapterStatusItem(BaseModel):
+    """Lightweight chapter status for polling."""
+
+    chapter_number: int
+    title: str | None = None
+    status: str
+    word_count: int | None = None
+    scene_statuses: list[SceneStatusItem] = Field(default_factory=list)
+
+
+class StoryStatusResponse(BaseModel):
+    """Lightweight status response for generation polling.
+
+    Never includes prose content. Safe to poll repeatedly.
+    """
+
+    id: UUID
+    status: str
+    title: str | None = None
+    actual_word_count: int | None = None
+    error_message: str | None = None
+    chapter_statuses: list[ChapterStatusItem] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: Story List Schemas
+# ---------------------------------------------------------------------------
+
+class StoryListItem(BaseModel):
+    """Summary row for the story list endpoint. No prose content."""
+
+    model_config = {"from_attributes": True}
+
+    id: UUID
+    title: str | None = None
+    mode: str
+    status: str
+    synopsis: str | None = None
+    target_word_count: int
+    actual_word_count: int | None = None
+    chapter_count: int
+    created_at: datetime
+
+
+class StoryListResponse(BaseModel):
+    """Paginated story list response."""
+
+    total: int
+    offset: int
+    limit: int
+    items: list[StoryListItem]
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: Reroll Request Schema
+# ---------------------------------------------------------------------------
+
+class RerollRequest(BaseModel):
+    """Request body for the reroll endpoint.
+
+    All fields are optional. If omitted, the reroll uses the original story's
+    mode and target_word_count with a fresh random seed.
+    """
+
+    seed: str | None = None
+    overrides: dict[str, str] = Field(default_factory=dict)
+    target_word_count: int | None = None
