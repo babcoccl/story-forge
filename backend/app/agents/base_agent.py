@@ -81,6 +81,30 @@ class BaseAgent:
                 resp.raise_for_status()
                 data = resp.json()
                 content = data["choices"][0]["message"]["content"]
+                # Qwen3 think-tag handling.
+                # Three possible structures the model produces:
+                #   A) <think>...</think>\nPROSE     — prose after closing tag (normal)
+                #   B) <think>PROSE</think>          — prose mistakenly inside tag
+                #   C) <think>PROSE (no closing tag) — truncated think block
+                #   D) PROSE (no think tags at all)  — ideal, pass through as-is
+
+                if "<think>" in content:
+                    # Try case A: extract everything after </think>
+                    after_match = re.search(r"</think>(.*)", content, re.DOTALL)
+                    if after_match:
+                        after_content = after_match.group(1).strip()
+                        if after_content:
+                            content = after_content
+                        else:
+                            # Case B: nothing after </think> — extract what's inside
+                            inside_match = re.search(
+                                r"<think>(.*?)</think>", content, re.DOTALL
+                            )
+                            content = inside_match.group(1).strip() if inside_match else ""
+                    else:
+                        # Case C: unclosed <think> — extract everything after the tag
+                        content = re.sub(r"<think>", "", content, flags=re.DOTALL).strip()
+
                 latency_ms = int((time.time() - start_ms) * 1000)
 
                 usage = data.get("usage", {})
@@ -148,6 +172,7 @@ class BaseAgent:
         scene_id: UUID | None = None,
         user_message: str = "",
         schema: dict | None = None,
+        max_tokens: int | None = None,
     ) -> dict:
         """Call LLM with JSON response format, parse and return dict."""
         rf = {"type": "json_object"}
@@ -157,6 +182,7 @@ class BaseAgent:
             scene_id=scene_id,
             user_message=user_message,
             response_format=rf,
+            max_tokens=max_tokens,
         )
 
         # Strip Qwen3 thinking blocks if present

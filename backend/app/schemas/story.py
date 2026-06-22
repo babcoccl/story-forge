@@ -97,11 +97,33 @@ class ChapterPlan(BaseModel):
     """One chapter in the story plan."""
 
     chapter_number: int = Field(..., description="1-based chapter number")
-    title: str = Field(..., description="Chapter title")
+    title: str | None = Field(None, description="Chapter title")
     summary: str = Field(..., description="2-3 sentence chapter summary")
     scenes: list[ScenePlan] = Field(
         ..., min_length=3, max_length=5, description="3-5 scenes per chapter"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, data: Any) -> Any:
+        """Remap alternate chapter field names the LLM may generate."""
+        if isinstance(data, dict):
+            # title variants
+            for alt in ("chapter_title", "name", "heading", "chapter_name"):
+                if alt in data and "title" not in data:
+                    data["title"] = data[alt]
+            # summary variants
+            for alt in ("description", "overview", "chapter_summary", "synopsis"):
+                if alt in data and "summary" not in data:
+                    data["summary"] = data[alt]
+        return data
+
+    @model_validator(mode="after")
+    def apply_defaults(self) -> "ChapterPlan":
+        """Apply fallback if title still None after normalization."""
+        if self.title is None:
+            self.title = f"Chapter {self.chapter_number}"
+        return self
 
 
 class StoryPlan(BaseModel):

@@ -49,15 +49,41 @@ async def main() -> None:
     print(f"Word count  : {story.actual_word_count}")
     print()
 
-    if hasattr(story, "chapters") and story.chapters:
-        for ch in sorted(story.chapters, key=lambda c: c.chapter_number):
+    # Reload story with chapters+scenes in a fresh session so relationships
+    # are available even though the original session from create_story closed.
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+
+        from backend.app.models.story import Story as StoryModel, StoryChapter
+
+        result = await db.execute(
+            select(StoryModel)
+            .where(StoryModel.id == story.id)
+            .options(
+                selectinload(StoryModel.chapters).selectinload(StoryChapter.scenes)
+            )
+        )
+        story_full = result.scalar_one()
+
+        for ch in sorted(story_full.chapters, key=lambda c: c.chapter_number):
             scene_count = len(ch.scenes) if ch.scenes else 0
             print(
                 f"  Chapter {ch.chapter_number}: {ch.title!r} "
                 f"— {ch.word_count or 0} words, {scene_count} scenes, "
                 f"status={ch.status}"
             )
-    print()
+        print()
+        if story_full.chapters:
+            ch1 = next(
+                (c for c in story_full.chapters if c.chapter_number == 1), None
+            )
+            if ch1 and ch1.content:
+                print("First 500 chars of Chapter 1:")
+                print(ch1.content[:500])
+            elif ch1:
+                print("Chapter 1 content is empty — scene writing produced no prose.")
+
     print("Phase 6 demo complete.")
 
 

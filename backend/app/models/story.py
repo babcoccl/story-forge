@@ -1,179 +1,203 @@
-"""Story domain models.
+"""Story-related database models.
 
-Models for Story, StoryChapter, StoryScene, and StoryComponentLink.
+Tables:
+  - stories: Top-level story record.
+  - story_component_links: Junction table for components used in a story.
+  - story_chapters: One row per chapter in a story.
+  - story_scenes: One row per scene within a chapter.
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, List
-
-if TYPE_CHECKING:
-    from backend.app.models.agent import AgentRun
-from uuid import UUID
-
-from sqlalchemy import ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import (
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.db.declarative_base import Base as DeclarativeBase
+from backend.app.db.declarative_base import Base
 from backend.app.models.mixins import TimestampMixin
 
+# ---------------------------------------------------------------------------
+# Story
+# ---------------------------------------------------------------------------
 
-class Story(TimestampMixin, DeclarativeBase):
-    """Root story record."""
+class Story(Base, TimestampMixin):
+    """The top-level story record."""
 
     __tablename__ = "stories"
+    __table_args__ = (
+        Index("ix_stories_status", "status"),
+        Index("ix_stories_mode", "mode"),
+        Index("ix_stories_parent_story_id", "parent_story_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        UUID(as_uuid=True),
         primary_key=True,
-        server_default="gen_random_uuid()",
-    )
-    parent_story_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("stories.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    mode: Mapped[str] = mapped_column(
-        String(50), nullable=False, comment="standalone | continuation"
+        server_default=text("uuid_generate_v4()"),
     )
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    synopsis: Mapped[str | None] = mapped_column(Text, nullable=True)
-    story_bible: Mapped[dict | None] = mapped_column(
-        JSONB,
-        nullable=True,
-        comment="Story bible JSON: tone, pacing_notes, characters, setting, world_building",
+    mode: Mapped[str] = mapped_column(
+        String(20), nullable=False, comment="'standalone' or 'continuation'"
     )
-    themes: Mapped[list | None] = mapped_column(
-        JSONB,
-        nullable=True,
-        comment="List of theme strings",
-    )
-    target_word_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    actual_word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    chapter_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    generation_seed: Mapped[str | None] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(
-        String(50),
+        String(30),
         nullable=False,
-        server_default="planning",
-        comment="planning | writing | assembled | complete | failed",
+        comment="'pending', 'planning', 'writing', 'assembled', 'reviewing', 'complete', 'failed'",
     )
+    generation_seed: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    synopsis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_word_count: Mapped[int] = mapped_column(Integer, nullable=False, default=15000)
+    actual_word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    parent_story_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("stories.id"),
+        nullable=True,
+    )
+    story_bible: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    style_profile: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    logline: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    completed_at: Mapped[str | None] = mapped_column(
+        "completed_at",
+        nullable=True,
+        comment="Stored as ISO string or timestamp",
+    )
 
     # Relationships
-    chapters: Mapped[List["StoryChapter"]] = relationship(
-        "StoryChapter", back_populates="story", cascade="all, delete-orphan"
+    parent_story: Mapped["Story | None"] = relationship(
+        "Story", remote_side="Story.id", backref="continuations"
     )
-    component_links: Mapped[List["StoryComponentLink"]] = relationship(
-        "StoryComponentLink", back_populates="story", cascade="all, delete-orphan"
-    )
-    agent_runs: Mapped[List["AgentRun"]] = relationship(
-        "AgentRun", back_populates="story"
-    )
-    parent: Mapped["Story | None"] = relationship(
-        "Story", remote_side=[id], backref="children"
-    )
+    chapters: Mapped[list["StoryChapter"]] = relationship(back_populates="story")
+    agent_runs: Mapped[list["AgentRun"]] = relationship(back_populates="story")
+    component_links: Mapped[list["StoryComponentLink"]] = relationship(back_populates="story")
 
 
-class StoryChapter(TimestampMixin, DeclarativeBase):
-    """Chapter within a story."""
+# ---------------------------------------------------------------------------
+# StoryComponentLink
+# ---------------------------------------------------------------------------
 
-    __tablename__ = "story_chapters"
+class StoryComponentLink(Base, TimestampMixin):
+    """Junction table recording which components were used in a story."""
+
+    __tablename__ = "story_component_links"
+    __table_args__ = (
+        UniqueConstraint("story_id", "component_id", "role", name="uq_links_story_component_role"),
+        Index("ix_links_story_id", "story_id"),
+        Index("ix_links_component_id", "component_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        UUID(as_uuid=True),
         primary_key=True,
-        server_default="gen_random_uuid()",
+        server_default=text("uuid_generate_v4()"),
     )
     story_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("stories.id", ondelete="CASCADE"),
+        UUID(as_uuid=True), ForeignKey("stories.id"), nullable=False
+    )
+    component_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("components.id"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(
+        String(100),
         nullable=False,
+        comment="e.g. protagonist, antagonist, primary_setting, main_activity",
+    )
+
+    # Relationships
+    story: Mapped["Story"] = relationship(back_populates="component_links")
+    component: Mapped["Component"] = relationship(
+        "Component", back_populates="story_links"
+    )
+
+
+# ---------------------------------------------------------------------------
+# StoryChapter
+# ---------------------------------------------------------------------------
+
+class StoryChapter(Base, TimestampMixin):
+    """One row per chapter in a story."""
+
+    __tablename__ = "story_chapters"
+    __table_args__ = (
+        UniqueConstraint("story_id", "chapter_number", name="uq_chapters_story_number"),
+        Index("ix_chapters_story_id", "story_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("uuid_generate_v4()"),
+    )
+    story_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stories.id"), nullable=False
     )
     chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     outline: Mapped[str | None] = mapped_column(Text, nullable=True)
     content: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Assembled prose for this chapter, populated by ChapterService",
     )
-    word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(
-        String(50),
+        String(30),
         nullable=False,
-        server_default="pending",
-        comment="pending | writing | complete | failed",
+        comment="'pending', 'writing', 'reviewing', 'complete', 'failed'",
     )
+    word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    canon_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # Relationships
-    story: Mapped["Story"] = relationship("Story", back_populates="chapters")
-    scenes: Mapped[List["StoryScene"]] = relationship(
-        "StoryScene", back_populates="chapter", cascade="all, delete-orphan"
-    )
+    story: Mapped["Story"] = relationship(back_populates="chapters")
+    scenes: Mapped[list["StoryScene"]] = relationship(back_populates="chapter")
 
 
-class StoryScene(TimestampMixin, DeclarativeBase):
-    """Scene within a chapter."""
+# ---------------------------------------------------------------------------
+# StoryScene
+# ---------------------------------------------------------------------------
+
+class StoryScene(Base, TimestampMixin):
+    """One row per scene within a chapter."""
 
     __tablename__ = "story_scenes"
+    __table_args__ = (
+        UniqueConstraint("chapter_id", "scene_number", name="uq_scenes_chapter_number"),
+        Index("ix_scenes_chapter_id", "chapter_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        UUID(as_uuid=True),
         primary_key=True,
-        server_default="gen_random_uuid()",
+        server_default=text("uuid_generate_v4()"),
     )
     chapter_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("story_chapters.id", ondelete="CASCADE"),
-        nullable=False,
+        UUID(as_uuid=True), ForeignKey("story_chapters.id"), nullable=False
     )
     scene_number: Mapped[int] = mapped_column(Integer, nullable=False)
     beat: Mapped[str | None] = mapped_column(Text, nullable=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(
-        String(50),
+        String(30),
         nullable=False,
-        server_default="pending",
-        comment="pending | writing | complete | failed",
+        comment="'pending', 'writing', 'complete', 'failed'",
     )
+    continuity_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    wordsmith_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    revision_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Relationships
-    chapter: Mapped["StoryChapter"] = relationship("StoryChapter", back_populates="scenes")
-    agent_runs: Mapped[List["AgentRun"]] = relationship(
-        "AgentRun", back_populates="scene"
-    )
+    chapter: Mapped["StoryChapter"] = relationship(back_populates="scenes")
+    agent_runs: Mapped[list["AgentRun"]] = relationship(back_populates="scene")
 
 
-class StoryComponentLink(DeclarativeBase):
-    """Associates a story with a sampled component."""
-
-    __tablename__ = "story_component_links"
-
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        primary_key=True,
-        server_default="gen_random_uuid()",
-    )
-    story_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("stories.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    component_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        nullable=False,
-        comment="ID of the sampled component from the components table",
-    )
-    role: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-        comment="Role this component plays: protagonist, antagonist, setting, inciting_incident, etc.",
-    )
-
-    # Relationships
-    story: Mapped["Story"] = relationship("Story", back_populates="component_links")
+# ---------------------------------------------------------------------------
+# Forward references for type hints
+# ---------------------------------------------------------------------------
+from backend.app.models.agent import AgentRun  # noqa: E402,F401
+from backend.app.models.component import Component  # noqa: E402,F401

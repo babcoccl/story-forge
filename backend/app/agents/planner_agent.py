@@ -88,6 +88,7 @@ class PlannerAgent(BaseAgent):
                     None,
                     user_message,
                     schema=StoryPlan.model_json_schema(),
+                    max_tokens=16000,
                 )
                 try:
                     plan = StoryPlan(**result)

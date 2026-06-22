@@ -205,9 +205,16 @@ class StoryService:
         logger.info("Assembling chapters for story %s", story.id)
         await self._chapter_service.assemble_chapters(db, story)
 
-        # Reload story to reflect final status from assembly
-        await db.refresh(story)
-        return story
+        # Reload with chapters and scenes eagerly loaded so callers can
+        # access story.chapters and chapter.scenes after the session closes.
+        result = await db.execute(
+            select(Story)
+            .where(Story.id == story.id)
+            .options(
+                selectinload(Story.chapters).selectinload(StoryChapter.scenes)
+            )
+        )
+        return result.scalar_one()
 
     async def _create_component_links(
         self,

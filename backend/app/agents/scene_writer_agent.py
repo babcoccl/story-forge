@@ -87,6 +87,19 @@ class SceneWriterAgent(BaseAgent):
                     scene_id=context.scene_id,
                     user_message=user_message,
                     max_tokens=max_tokens,
+                    response_format={"type": "text"},
+                )
+                # Empty prose from LLM is a retryable failure — raise AgentError
+                # so the outer retry loop (attempt 1→2→3) handles it properly.
+                if not prose.strip():
+                    raise AgentError(
+                        f"SceneWriterAgent received empty prose from LLM "
+                        f"(scene={context.scene_id}, attempt={attempt})"
+                    )
+                logger.debug(
+                    "SceneWriterAgent raw prose length: %d chars (scene=%s)",
+                    len(prose),
+                    context.scene_id,
                 )
                 actual_word_count = len(prose.split())
                 deviation = abs(actual_word_count - context.word_count_target) / max(
@@ -147,7 +160,5 @@ class SceneWriterAgent(BaseAgent):
             f"  Target   : {context.word_count_target} words",
             "",
             "Write the scene now. Output prose only — no headers, no commentary.",
-            "",
-            "/no_think",
         ]
         return "\n".join(lines)
