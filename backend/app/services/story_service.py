@@ -369,6 +369,20 @@ class StoryService:
 
         await db.commit()
 
+        # Reload story with chapters and scenes eagerly loaded before passing
+        # to write_all_scenes(). The commit above expires all ORM attributes,
+        # so accessing story.chapters or chapter.scenes would trigger a lazy
+        # load (MissingGreenlet). This reload ensures all relationship
+        # collections are populated in-session and unexpired.
+        result = await db.execute(
+            select(Story)
+            .where(Story.id == story.id)
+            .options(
+                selectinload(Story.chapters).selectinload(StoryChapter.scenes)
+            )
+        )
+        story = result.scalar_one()
+
         # Step 7: Write scene prose via SceneWriterAgent
         logger.info("Starting scene writing for story %s", story.id)
         await self._scene_service.write_all_scenes(db, story, plan)

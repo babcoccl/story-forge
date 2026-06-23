@@ -3,16 +3,19 @@
 Phase 5: POST /stories/, GET /stories/{story_id}
 Phase 7: GET /stories/, POST /stories/{story_id}/reroll,
          GET /stories/{story_id}/status
-Phase 8 Hotfix: Background pipeline execution via FastAPI BackgroundTasks.
+Phase 8 Hotfix 2: Detached pipeline execution via asyncio.create_task()
+    (replaces BackgroundTasks to prevent cancellation on navigation).
 
-See SPEC_PHASE_5.md, SPEC_PHASE_7.md and SPEC_PHASE_8_HOTFIX.md for full specification.
+See SPEC_PHASE_5.md, SPEC_PHASE_7.md, SPEC_PHASE_8_HOTFIX.md and
+    SPEC_PHASE_8_HOTFIX2.md for full specification.
 """
 
 from __future__ import annotations
 
+import asyncio
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -44,7 +47,7 @@ def get_db() -> AsyncSession:
 
 
 # ---------------------------------------------------------------------------
-# Phase 5 endpoints (preserved) — Phase 8 Hotfix: async + background task
+# Phase 5 endpoints (preserved) — Phase 8 Hotfix 2: asyncio.create_task
 # ---------------------------------------------------------------------------
 
 @router.post(
@@ -54,17 +57,17 @@ def get_db() -> AsyncSession:
 )
 async def create_story(
     request: StoryCreateRequest,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> StoryResponse:
     """Create a new story record and schedule pipeline execution in the background.
+
+    Uses asyncio.create_task() so the pipeline runs independently of the
+    request lifecycle — navigating away cannot cancel it.
 
     Parameters
     ----------
     request : StoryCreateRequest
         Client request with mode, seed, overrides, target_word_count.
-    background_tasks : BackgroundTasks
-        FastAPI background task executor.
     db : AsyncSession
         Database session provided by FastAPI dependency injection.
 
@@ -77,7 +80,7 @@ async def create_story(
     story = await svc.create_story_record(request)
 
     # Schedule the slow pipeline in the background
-    background_tasks.add_task(svc.run_pipeline, story.id, request)
+    asyncio.create_task(svc.run_pipeline(story.id, request))
 
     return StoryResponse(
         id=story.id,
@@ -293,7 +296,7 @@ async def get_story_status(
 
 
 # ---------------------------------------------------------------------------
-# Phase 7: Reroll — Phase 8 Hotfix: async + background task
+# Phase 7: Reroll — Phase 8 Hotfix 2: asyncio.create_task
 # ---------------------------------------------------------------------------
 
 @router.post(
@@ -304,7 +307,6 @@ async def get_story_status(
 async def reroll_story(
     story_id: UUID,
     request: RerollRequest,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> StoryResponse:
     """Schedule a reroll for an existing story.
@@ -317,14 +319,15 @@ async def reroll_story(
     Stories currently in a generation pipeline (status="planning", "writing")
     return 409 Conflict.
 
+    Uses asyncio.create_task() so the pipeline runs independently of the
+    request lifecycle.
+
     Parameters
     ----------
     story_id : UUID
         The story record ID.
     request : RerollRequest
         Optional seed, component overrides, and target_word_count.
-    background_tasks : BackgroundTasks
-        FastAPI background task executor.
     db : AsyncSession
         Database session provided by FastAPI dependency injection.
 
@@ -364,7 +367,7 @@ async def reroll_story(
         sum(len(ch.scenes) for ch in story.chapters) if story.chapters else 0
     )
 
-    background_tasks.add_task(StoryService().reroll_story, story_id, request)
+    asyncio.create_task(StoryService().reroll_story(story_id, request))
 
     return StoryResponse(
         id=story.id,

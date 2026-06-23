@@ -26,9 +26,11 @@ export interface StoryResponse {
   generation_seed: string | null;
   synopsis: string | null;
   target_word_count: number;
+  actual_word_count: number | null;
   story_bible: Record<string, unknown> | null;
   chapter_count: number;
   scene_count: number;
+  error_message: string | null;
   created_at: string;
 }
 

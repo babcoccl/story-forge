@@ -17,6 +17,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from backend.app.agents.base_agent import AgentError
 from backend.app.agents.scene_writer_agent import SceneWriterAgent
@@ -199,10 +200,12 @@ class SceneService:
         chapter_number: int,
     ) -> StoryChapter | None:
         result = await db.execute(
-            select(StoryChapter).where(
+            select(StoryChapter)
+            .where(
                 StoryChapter.story_id == story_id,
                 StoryChapter.chapter_number == chapter_number,
             )
+            .options(selectinload(StoryChapter.scenes))
         )
         return result.scalar_one_or_none()
 

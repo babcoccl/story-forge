@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { createStory, getStreamUrl, getStoryStatus } from "@/lib/api";
+import { createStory, getStory, getStreamUrl, getStoryStatus } from "@/lib/api";
 import type {
   SseAssembledPayload,
   SseChapterCompletePayload,
@@ -80,6 +80,9 @@ function StatusBadgeComponent({ status }: { status: StoryStatus }) {
 // Page component
 // ---------------------------------------------------------------------------
 
+// sessionStorage key for navigation state recovery
+const ACTIVE_STORY_KEY = "storyforge_active_story_id";
+
 export default function GeneratePage() {
   // Form state
   const [mode, setMode] = useState<StoryMode>("standalone");
@@ -101,6 +104,43 @@ export default function GeneratePage() {
 
   // SSE ref — held outside state to allow cleanup
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // Navigation state rehydration — MUST be first useEffect
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    const savedId = sessionStorage.getItem(ACTIVE_STORY_KEY);
+    if (!savedId) return;
+
+    getStoryStatus(savedId)
+      .then((statusResp) => {
+        if (statusResp.status === "planning" || statusResp.status === "writing") {
+          setStoryId(savedId);
+          setPageState("generating");
+        } else if (statusResp.status === "assembled" || statusResp.status === "complete") {
+          return getStory(savedId).then((story) => {
+            setResult({
+              storyId: savedId,
+              title: story.title ?? null,
+              actualWordCount: story.actual_word_count,
+              chapterCount: story.chapter_count,
+            });
+            setPageState("done");
+            sessionStorage.removeItem(ACTIVE_STORY_KEY);
+          });
+        } else {
+          setErrorMessage("Previous generation failed or could not be found.");
+          setPageState("error");
+          sessionStorage.removeItem(ACTIVE_STORY_KEY);
+        }
+      })
+      .catch(() => {
+        setErrorMessage("Previous generation failed or could not be found.");
+        setPageState("error");
+        sessionStorage.removeItem(ACTIVE_STORY_KEY);
+      });
+  }, []);
 
   // ---------------------------------------------------------------------------
   // SSE lifecycle
@@ -141,6 +181,7 @@ export default function GeneratePage() {
             chapterCount: payload.chapter_count,
           });
           setPageState("done");
+          sessionStorage.removeItem(ACTIVE_STORY_KEY);
           es.close();
         })
         .catch(() => {
@@ -152,6 +193,7 @@ export default function GeneratePage() {
             chapterCount: payload.chapter_count,
           });
           setPageState("done");
+          sessionStorage.removeItem(ACTIVE_STORY_KEY);
           es.close();
         });
     });
@@ -165,6 +207,7 @@ export default function GeneratePage() {
         setErrorMessage("An unknown error occurred during generation.");
       }
       setPageState("error");
+      sessionStorage.removeItem(ACTIVE_STORY_KEY);
       es.close();
     });
 
@@ -172,6 +215,7 @@ export default function GeneratePage() {
     es.onerror = () => {
       setErrorMessage("Lost connection to the generation stream. The server may be restarting.");
       setPageState("error");
+      sessionStorage.removeItem(ACTIVE_STORY_KEY);
       es.close();
     };
 
@@ -223,6 +267,7 @@ export default function GeneratePage() {
       });
       setStoryId(story.id);
       setPageState("generating");
+      sessionStorage.setItem(ACTIVE_STORY_KEY, story.id);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Failed to start generation.");
       setPageState("error");
@@ -237,6 +282,7 @@ export default function GeneratePage() {
     setResult(null);
     setErrorMessage(null);
     setWritingStatus(null);
+    sessionStorage.removeItem(ACTIVE_STORY_KEY);
   }
 
   // ---------------------------------------------------------------------------
