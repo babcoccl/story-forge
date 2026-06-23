@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.app.agents.planner_agent import PlannerAgent
+from backend.app.db.session import AsyncSessionLocal
 from backend.app.models.story import Story, StoryChapter, StoryComponentLink, StoryScene
 from backend.app.schemas.sampler import BundleItem, SampleRequest
 from backend.app.schemas.story import RerollRequest, StoryCreateRequest, StoryPlan
@@ -52,7 +53,96 @@ class StoryService:
         self._chapter_service = ChapterService()
 
     # ------------------------------------------------------------------
-    # Public API
+    # Public API — fast path (returns immediately)
+    # ------------------------------------------------------------------
+
+    async def create_story_record(
+        self,
+        request: StoryCreateRequest,
+    ) -> Story:
+        """Create a Story record and return it immediately (pipeline runs later).
+
+        Opens its own AsyncSessionLocal session, inserts and flushes the Story
+        row (status="planning"), commits, and returns the ORM object with id
+        populated.  Does NOT run the generation pipeline.
+
+        Parameters
+        ----------
+        request : StoryCreateRequest
+            Client request with mode, seed, overrides, target_word_count.
+
+        Returns
+        -------
+        Story
+            Persisted Story ORM object (id populated, status="planning").
+        """
+        db = AsyncSessionLocal()
+        try:
+            story = Story(
+                mode=request.mode,
+                target_word_count=request.target_word_count,
+                status="planning",
+            )
+
+            if request.parent_story_id is not None:
+                story.parent_story_id = request.parent_story_id
+
+            db.add(story)
+            await db.flush()
+            await db.commit()
+            return story
+        except Exception:
+            await db.rollback()
+            raise
+        finally:
+            await db.close()
+
+    # ------------------------------------------------------------------
+    # Public API — slow path (background task)
+    # ------------------------------------------------------------------
+
+    async def run_pipeline(
+        self,
+        story_id: UUID,
+        request: StoryCreateRequest,
+    ) -> None:
+        """Run the full generation pipeline for an existing story record.
+
+        Opens its own AsyncSessionLocal session, loads the Story by *story_id*,
+        runs the full pipeline, and persists the result.  Intended to be
+        registered as a FastAPI BackgroundTask.
+
+        Parameters
+        ----------
+        story_id : UUID
+            The id of the pre-created Story record.
+        request : StoryCreateRequest
+            The original client request.
+
+        Returns
+        -------
+        None
+            Result is persisted to the database, not returned to the caller.
+        """
+        db = AsyncSessionLocal()
+        try:
+            story = await self.get_story_by_id(db, story_id)
+            if story is None:
+                logger.error("run_pipeline: story %s not found", story_id)
+                return
+
+            await self._execute_pipeline(db, story, request)
+        except Exception as exc:
+            logger.error("Pipeline failed for story %s: %s", story_id, exc)
+            story = await self.get_story_by_id(db, story_id)
+            if story is not None:
+                await self._mark_failed(db, story, str(exc))
+            raise
+        finally:
+            await db.close()
+
+    # ------------------------------------------------------------------
+    # Public API — legacy (direct call with caller-provided session)
     # ------------------------------------------------------------------
 
     async def create_story(
@@ -60,35 +150,10 @@ class StoryService:
         db: AsyncSession,
         request: StoryCreateRequest,
     ) -> Story:
-        """Create a new story with structured plan from approved components.
+        """Create a new story and run the full pipeline synchronously.
 
-        Pipeline:
-        1. Insert Story record (status="planning")
-        2. Call RerollService.get_approved_bundle()
-        3. Create StoryComponentLink records
-        4. Call PlannerAgent.plan()
-        5. Create StoryChapter + StoryScene records
-        6. Update Story with plan data (status="writing")
-        7. Call SceneService.write_all_scenes()
-        8. Call ChapterService.assemble_chapters()
-
-        Parameters
-        ----------
-        db : AsyncSession
-            Active database session.
-        request : StoryCreateRequest
-            Client request with mode, seed, overrides, target_word_count.
-
-        Returns
-        -------
-        Story
-            Fully populated Story ORM object with chapters eagerly loaded.
-
-        Raises
-        ------
-        Exception
-            Any exception from the pipeline. On failure, Story status is
-            set to "failed" with error_message populated.
+        Kept for backward compatibility (e.g. CLI scripts, tests).
+        For the HTTP API, prefer create_story_record() + run_pipeline().
         """
         story = Story(
             mode=request.mode,
@@ -110,35 +175,77 @@ class StoryService:
 
     async def reroll_story(
         self,
+        story_id: UUID,
+        request: RerollRequest,
+    ) -> None:
+        """Re-run the full generation pipeline on an existing story record.
+
+        Opens its own AsyncSessionLocal session.  Clears all existing pipeline
+        data, resets story state, and re-runs the full pipeline.  Intended to
+        be registered as a FastAPI BackgroundTask.
+
+        Parameters
+        ----------
+        story_id : UUID
+            The id of the Story record to reroll.
+        request : RerollRequest
+            Optional overrides for seed, component overrides, target_word_count.
+
+        Returns
+        -------
+        None
+            Result is persisted to the database.
+        """
+        db = AsyncSessionLocal()
+        try:
+            story = await self.get_story_by_id(db, story_id)
+            if story is None:
+                logger.error("reroll_story: story %s not found", story_id)
+                return
+
+            target_word_count = request.target_word_count or story.target_word_count
+
+            # Clear existing pipeline data
+            await self._delete_existing_pipeline_data(db, story.id)
+
+            # Reset story state
+            story.status = "planning"
+            story.error_message = None
+            story.title = None
+            story.synopsis = None
+            story.generation_seed = None
+            story.story_bible = None
+            story.actual_word_count = None
+            story.target_word_count = target_word_count
+            await db.commit()
+
+            # Build a StoryCreateRequest-compatible object for the pipeline
+            create_request = StoryCreateRequest(
+                mode=story.mode,
+                seed=request.seed,
+                overrides=request.overrides,
+                target_word_count=target_word_count,
+            )
+
+            await self._execute_pipeline(db, story, create_request)
+        except Exception as exc:
+            logger.error("Reroll failed for story %s: %s", story_id, exc)
+            story = await self.get_story_by_id(db, story_id)
+            if story is not None:
+                await self._mark_failed(db, story, str(exc))
+            raise
+        finally:
+            await db.close()
+
+    async def reroll_story_sync(
+        self,
         db: AsyncSession,
         story: Story,
         request: RerollRequest,
     ) -> Story:
-        """Re-run the full generation pipeline on an existing story record.
+        """Synchronous reroll for backward compatibility (CLI scripts, tests).
 
-        Clears all existing pipeline data (component links, chapters, scenes)
-        and re-runs the full pipeline with a new component bundle sample.
-        The story record's id, mode, and created_at are preserved.
-
-        Parameters
-        ----------
-        db : AsyncSession
-            Active database session.
-        story : Story
-            The existing Story ORM object to reroll.
-        request : RerollRequest
-            Optional overrides for seed, component overrides, and target_word_count.
-
-        Returns
-        -------
-        Story
-            The updated Story ORM object with newly assembled content.
-
-        Raises
-        ------
-        Exception
-            Any exception from the pipeline. On failure, story.status is
-            set to "failed" with error_message populated.
+        Accepts a caller-provided session and Story ORM object.
         """
         target_word_count = request.target_word_count or story.target_word_count
 

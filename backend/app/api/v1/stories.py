@@ -3,15 +3,16 @@
 Phase 5: POST /stories/, GET /stories/{story_id}
 Phase 7: GET /stories/, POST /stories/{story_id}/reroll,
          GET /stories/{story_id}/status
+Phase 8 Hotfix: Background pipeline execution via FastAPI BackgroundTasks.
 
-See SPEC_PHASE_5.md and SPEC_PHASE_7.md for full specification.
+See SPEC_PHASE_5.md, SPEC_PHASE_7.md and SPEC_PHASE_8_HOTFIX.md for full specification.
 """
 
 from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -43,50 +44,40 @@ def get_db() -> AsyncSession:
 
 
 # ---------------------------------------------------------------------------
-# Phase 5 endpoints (preserved exactly)
+# Phase 5 endpoints (preserved) — Phase 8 Hotfix: async + background task
 # ---------------------------------------------------------------------------
 
 @router.post(
     "/",
     response_model=StoryResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def create_story(
     request: StoryCreateRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> StoryResponse:
-    """Create a new story with structured plan from approved components.
+    """Create a new story record and schedule pipeline execution in the background.
 
     Parameters
     ----------
     request : StoryCreateRequest
         Client request with mode, seed, overrides, target_word_count.
+    background_tasks : BackgroundTasks
+        FastAPI background task executor.
     db : AsyncSession
         Database session provided by FastAPI dependency injection.
 
     Returns
     -------
     StoryResponse
-        The created story with computed chapter_count and scene_count.
-
-    Raises
-    ------
-    HTTPException
-        500 if story creation fails.
+        The created story record (status="planning", chapter_count=0, scene_count=0).
     """
     svc = StoryService()
-    try:
-        story = await svc.create_story(db, request)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Story creation failed: {exc}",
-        )
+    story = await svc.create_story_record(request)
 
-    chapter_count = len(story.chapters) if story.chapters else 0
-    scene_count = (
-        sum(len(ch.scenes) for ch in story.chapters) if story.chapters else 0
-    )
+    # Schedule the slow pipeline in the background
+    background_tasks.add_task(svc.run_pipeline, story.id, request)
 
     return StoryResponse(
         id=story.id,
@@ -97,8 +88,8 @@ async def create_story(
         synopsis=story.synopsis,
         target_word_count=story.target_word_count,
         story_bible=story.story_bible,
-        chapter_count=chapter_count,
-        scene_count=scene_count,
+        chapter_count=0,
+        scene_count=0,
         created_at=story.created_at,
     )
 
@@ -302,20 +293,21 @@ async def get_story_status(
 
 
 # ---------------------------------------------------------------------------
-# Phase 7: Reroll
+# Phase 7: Reroll — Phase 8 Hotfix: async + background task
 # ---------------------------------------------------------------------------
 
 @router.post(
     "/{story_id}/reroll",
     response_model=StoryResponse,
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def reroll_story(
     story_id: UUID,
     request: RerollRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> StoryResponse:
-    """Re-run the generation pipeline for an existing story.
+    """Schedule a reroll for an existing story.
 
     Deletes existing component links, chapters, and scenes, then re-samples
     a new bundle and regenerates the full story in-place. The story record's
@@ -331,20 +323,21 @@ async def reroll_story(
         The story record ID.
     request : RerollRequest
         Optional seed, component overrides, and target_word_count.
+    background_tasks : BackgroundTasks
+        FastAPI background task executor.
     db : AsyncSession
         Database session provided by FastAPI dependency injection.
 
     Returns
     -------
     StoryResponse
-        The rerolled story with new chapter_count and scene_count.
+        The current story state (before reroll pipeline runs).
 
     Raises
     ------
     HTTPException
         404 if story not found.
         409 if story is currently generating.
-        500 if reroll pipeline fails.
     """
     stmt = select(Story).where(Story.id == story_id)
     result = await db.execute(stmt)
@@ -365,19 +358,13 @@ async def reroll_story(
             ),
         )
 
-    svc = StoryService()
-    try:
-        story = await svc.reroll_story(db, story, request)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Reroll failed: {exc}",
-        )
-
+    # Return current state immediately; schedule reroll in background
     chapter_count = len(story.chapters) if story.chapters else 0
     scene_count = (
         sum(len(ch.scenes) for ch in story.chapters) if story.chapters else 0
     )
+
+    background_tasks.add_task(StoryService().reroll_story, story_id, request)
 
     return StoryResponse(
         id=story.id,
