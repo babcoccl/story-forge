@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getChapters, getStory } from "@/lib/api";
 import type { ChapterListResponse, SceneResponse, StoryStatus } from "@/lib/types";
@@ -45,7 +46,10 @@ function StatusBadge({ status }: { status: StoryStatus }) {
 function SceneBlock({ scene }: { scene: SceneResponse }) {
   const [collapsed, setCollapsed] = useState(false);
   const text = scene.content ?? "";
-  const wordCount = text.length;
+  const wordCount =
+    (scene.word_count ?? 0) > 0
+      ? scene.word_count!
+      : text.split(/\s+/).filter(Boolean).length;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -166,7 +170,16 @@ export default function StoryReaderPage() {
   const stats = useMemo(() => {
     const totalScenes = chapters.reduce((sum, ch) => sum + ch.scenes.length, 0);
     const totalWords = chapters.reduce(
-      (sum, ch) => sum + ch.scenes.reduce((s, sc) => s + (sc.content ?? "").length, 0),
+      (sum, ch) =>
+        sum +
+        ch.scenes.reduce(
+          (s, sc) =>
+            s +
+            ((sc.word_count ?? 0) > 0
+              ? sc.word_count!
+              : (sc.content ?? "").split(/\s+/).filter(Boolean).length),
+          0,
+        ),
       0,
     );
     return { totalScenes, totalWords };
@@ -181,7 +194,7 @@ export default function StoryReaderPage() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <a
+          <Link
             href="/generate"
             className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-500 mb-2"
           >
@@ -189,7 +202,7 @@ export default function StoryReaderPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Back to Generate
-          </a>
+           </Link>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">
             {title ?? "Loading…"}
           </h1>

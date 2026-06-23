@@ -101,6 +101,13 @@ class SceneService:
                 )
                 continue
 
+            # Mark chapter as writing before first scene starts
+            chapter_orm.status = "writing"
+            await db.commit()
+
+            # Pre-compute max scene number for last-scene detection
+            max_scene_number = max(sp.scene_number for sp in chapter_plan.scenes)
+
             for scene_plan in chapter_plan.scenes:
                 scene_orm = await self._load_scene(
                     db, chapter_orm.id, scene_plan.scene_number
@@ -165,6 +172,23 @@ class SceneService:
                             target_word_count=context.word_count_target,
                         )
                     )
+
+                # After last scene in chapter, mark chapter complete if
+                # at least one scene completed successfully
+                if scene_plan.scene_number == max_scene_number:
+                    has_complete = any(
+                        sc.status == "complete"
+                        for sc in chapter_orm.scenes
+                        if sc.status in ("complete", "failed", "writing")
+                    )
+                    if has_complete:
+                        chapter_orm.status = "complete"
+                        await db.commit()
+                        logger.info(
+                            "Chapter %d marked complete for story %s",
+                            chapter_plan.chapter_number,
+                            story.id,
+                        )
 
         return outputs
 

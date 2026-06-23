@@ -86,7 +86,8 @@ class ChapterService:
 
             chapter.content = assembled_prose
             chapter.word_count = chapter_word_count
-            chapter.status = "complete"
+            if chapter.status != "complete":
+                chapter.status = "complete"
             await db.commit()
 
             total_word_count += chapter_word_count
