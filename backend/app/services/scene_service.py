@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.app.agents.base_agent import AgentError
+from backend.app.agents.continuity_agent import ContinuityAgent
 from backend.app.agents.scene_writer_agent import SceneWriterAgent
 from backend.app.models.story import Story, StoryChapter, StoryScene
 from backend.app.schemas.story import SceneContext, SceneOutput, StoryPlan
@@ -31,7 +32,7 @@ class SceneService:
     """Orchestrates SceneWriterAgent across all scenes in a story plan."""
 
     def __init__(self) -> None:
-        self._writer = SceneWriterAgent()
+        pass
 
     async def write_all_scenes(
         self,
@@ -64,6 +65,7 @@ class SceneService:
             Failed scenes will have prose="" and actual_word_count=0.
         """
         outputs: list[SceneOutput] = []
+        running_digest: str = ""
         story_bible = story.story_bible or {}
 
         protagonist_name = ""
@@ -90,106 +92,131 @@ class SceneService:
                     antagonist_name = char.get("name", "")
                     antagonist_description = char.get("description", "")
 
-        for chapter_plan in plan.chapters:
-            chapter_orm = await self._load_chapter(
-                db, story.id, chapter_plan.chapter_number
-            )
-            if chapter_orm is None:
-                logger.error(
-                    "Chapter %d not found in DB for story %s — skipping",
-                    chapter_plan.chapter_number,
-                    story.id,
+        async with SceneWriterAgent() as writer, ContinuityAgent() as continuity:
+            for chapter_plan in plan.chapters:
+                chapter_orm = await self._load_chapter(
+                    db, story.id, chapter_plan.chapter_number
                 )
-                continue
-
-            # Mark chapter as writing before first scene starts
-            chapter_orm.status = "writing"
-            await db.commit()
-
-            # Pre-compute max scene number for last-scene detection
-            max_scene_number = max(sp.scene_number for sp in chapter_plan.scenes)
-
-            for scene_plan in chapter_plan.scenes:
-                scene_orm = await self._load_scene(
-                    db, chapter_orm.id, scene_plan.scene_number
-                )
-                if scene_orm is None:
+                if chapter_orm is None:
                     logger.error(
-                        "Scene %d not found in DB for chapter %s — skipping",
-                        scene_plan.scene_number,
-                        chapter_orm.id,
+                        "Chapter %d not found in DB for story %s — skipping",
+                        chapter_plan.chapter_number,
+                        story.id,
                     )
                     continue
 
-                context = SceneContext(
-                    scene_id=scene_orm.id,
-                    chapter_number=chapter_plan.chapter_number,
-                    chapter_title=chapter_plan.title,
-                    scene_number=scene_plan.scene_number,
-                    beat=scene_orm.beat or "",
-                    goal=scene_plan.goal,
-                    conflict=scene_plan.conflict,
-                    outcome=scene_plan.outcome,
-                    setting_note=scene_plan.setting_note or "Primary setting",
-                    word_count_target=scene_plan.word_count_target or 1250,
-                    protagonist_name=protagonist_name,
-                    protagonist_description=protagonist_description,
-                    antagonist_name=antagonist_name,
-                    antagonist_description=antagonist_description,
-                    tone=tone,
-                    pacing_notes=pacing_notes,
-                )
+                # Mark chapter as writing before first scene starts
+                chapter_orm.status = "writing"
+                await db.commit()
 
-                try:
-                    scene_orm.status = "writing"
-                    await db.commit()
+                # Pre-compute max scene number for last-scene detection
+                max_scene_number = max(sp.scene_number for sp in chapter_plan.scenes)
 
-                    output = await self._writer.write(db, context, story.id)
-                    scene_orm.content = output.prose
-                    scene_orm.word_count = output.actual_word_count
-                    scene_orm.status = "complete"
-                    await db.commit()
-
-                    logger.info(
-                        "Scene %s written: %d words",
-                        scene_orm.id,
-                        output.actual_word_count,
+                for scene_plan in chapter_plan.scenes:
+                    scene_orm = await self._load_scene(
+                        db, chapter_orm.id, scene_plan.scene_number
                     )
-                    outputs.append(output)
-
-                except AgentError as exc:
-                    logger.error(
-                        "SceneWriterAgent failed for scene %s: %s",
-                        scene_orm.id,
-                        exc,
-                    )
-                    scene_orm.status = "failed"
-                    await db.commit()
-                    outputs.append(
-                        SceneOutput(
-                            scene_id=scene_orm.id,
-                            prose="",
-                            actual_word_count=0,
-                            target_word_count=context.word_count_target,
+                    if scene_orm is None:
+                        logger.error(
+                            "Scene %d not found in DB for chapter %s — skipping",
+                            scene_plan.scene_number,
+                            chapter_orm.id,
                         )
+                        continue
+
+                    context = SceneContext(
+                        scene_id=scene_orm.id,
+                        chapter_number=chapter_plan.chapter_number,
+                        chapter_title=chapter_plan.title,
+                        scene_number=scene_plan.scene_number,
+                        beat=scene_orm.beat or "",
+                        goal=scene_plan.goal,
+                        conflict=scene_plan.conflict,
+                        outcome=scene_plan.outcome,
+                        setting_note=scene_plan.setting_note or "Primary setting",
+                        word_count_target=scene_plan.word_count_target or 1250,
+                        protagonist_name=protagonist_name,
+                        protagonist_description=protagonist_description,
+                        antagonist_name=antagonist_name,
+                        antagonist_description=antagonist_description,
+                        tone=tone,
+                        pacing_notes=pacing_notes,
+                        continuity_digest=running_digest if running_digest else None,
                     )
 
-                # After last scene in chapter, mark chapter complete if
-                # at least one scene completed successfully
-                if scene_plan.scene_number == max_scene_number:
-                    has_complete = any(
-                        sc.status == "complete"
-                        for sc in chapter_orm.scenes
-                        if sc.status in ("complete", "failed", "writing")
-                    )
-                    if has_complete:
-                        chapter_orm.status = "complete"
+                    try:
+                        scene_orm.status = "writing"
                         await db.commit()
+
+                        output = await writer.write(db, context, story.id)
+                        scene_orm.content = output.prose
+                        scene_orm.word_count = output.actual_word_count
+                        scene_orm.status = "complete"
+                        await db.commit()
+
+                        # Update continuity digest after successful scene write
+                        try:
+                            running_digest = await continuity.update_digest(
+                                db=db,
+                                story_id=story.id,
+                                scene_id=scene_orm.id,
+                                scene_prose=output.prose,
+                                prior_digest=running_digest,
+                            )
+                            scene_orm.continuity_notes = running_digest
+                            await db.commit()
+                            logger.debug(
+                                "Continuity digest updated after scene %s (%d chars)",
+                                scene_orm.id,
+                                len(running_digest),
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "ContinuityAgent failed for scene %s — skipping: %s",
+                                scene_orm.id,
+                                exc,
+                            )
+
                         logger.info(
-                            "Chapter %d marked complete for story %s",
-                            chapter_plan.chapter_number,
-                            story.id,
+                            "Scene %s written: %d words",
+                            scene_orm.id,
+                            output.actual_word_count,
                         )
+                        outputs.append(output)
+
+                    except AgentError as exc:
+                        logger.error(
+                            "SceneWriterAgent failed for scene %s: %s",
+                            scene_orm.id,
+                            exc,
+                        )
+                        scene_orm.status = "failed"
+                        await db.commit()
+                        outputs.append(
+                            SceneOutput(
+                                scene_id=scene_orm.id,
+                                prose="",
+                                actual_word_count=0,
+                                target_word_count=context.word_count_target,
+                            )
+                        )
+
+                    # After last scene in chapter, mark chapter complete if
+                    # at least one scene completed successfully
+                    if scene_plan.scene_number == max_scene_number:
+                        has_complete = any(
+                            sc.status == "complete"
+                            for sc in chapter_orm.scenes
+                            if sc.status in ("complete", "failed", "writing")
+                        )
+                        if has_complete:
+                            chapter_orm.status = "complete"
+                            await db.commit()
+                            logger.info(
+                                "Chapter %d marked complete for story %s",
+                                chapter_plan.chapter_number,
+                                story.id,
+                            )
 
         return outputs
 

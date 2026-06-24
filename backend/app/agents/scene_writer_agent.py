@@ -36,7 +36,10 @@ class SceneWriterAgent(BaseAgent):
         "Do not summarize — write prose. Show, don't tell. "
         "Maintain character voice and tone from the story bible provided. "
         "End every scene with a clear narrative beat transition that sets up the next scene. "
-        "Output prose only — no headers, no scene labels, no commentary."
+        "Output prose only — no headers, no scene labels, no commentary. "
+        "When a Continuity State section is provided, treat it as ground truth "
+        "for current character locations, emotional states, and open narrative "
+        "threads — your scene must be consistent with it."
     )
 
     @property
@@ -155,7 +158,13 @@ class SceneWriterAgent(BaseAgent):
             f"  Outcome  : {context.outcome}",
             f"  Setting  : {context.setting_note}",
             f"  Target   : {context.word_count_target} words",
-            "",
-            "Write the scene now. Output prose only — no headers, no commentary.",
         ]
+
+        if context.continuity_digest:
+            lines.append("")
+            lines.append("Continuity State (what has actually happened so far):")
+            lines.append(context.continuity_digest)
+
+        lines.append("")
+        lines.append("Write the scene now. Output prose only — no headers, no commentary.")
         return "\n".join(lines)

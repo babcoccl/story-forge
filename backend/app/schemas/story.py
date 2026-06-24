@@ -210,6 +210,7 @@ class SceneContext(BaseModel):
     antagonist_description: str
     tone: str
     pacing_notes: str
+    continuity_digest: str | None = None
 
 
 class SceneOutput(BaseModel):

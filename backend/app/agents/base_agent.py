@@ -207,3 +207,9 @@ class BaseAgent:
 
     async def close(self) -> None:
         await self._client.aclose()
+
+    async def __aenter__(self) -> "BaseAgent":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        await self.close()
