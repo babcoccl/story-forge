@@ -9,6 +9,7 @@
 import type {
   ChapterListResponse,
   StoryCreateRequest,
+  StoryListItem,
   StoryResponse,
   StoryStatusResponse,
 } from "./types";
@@ -75,4 +76,15 @@ export async function getStoryStatus(storyId: string): Promise<StoryStatusRespon
     throw new Error(`Failed to fetch status (${res.status})`);
   }
   return res.json() as Promise<StoryStatusResponse>;
+}
+
+/**
+ * GET /api/v1/stories/ — list all stories (lightweight cards).
+ */
+export async function listStories(): Promise<StoryListItem[]> {
+  const res = await fetch(`${API_BASE}/stories/`);
+  if (!res.ok) {
+    throw new Error(`Failed to list stories (${res.status})`);
+  }
+  return res.json() as Promise<StoryListItem[]>;
 }

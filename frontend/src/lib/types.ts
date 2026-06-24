@@ -41,6 +41,16 @@ export interface StoryCreateRequest {
   target_word_count?: number;
 }
 
+/** Lightweight story card for the home-page grid */
+export interface StoryListItem {
+  id: string;
+  title: string | null;
+  status: StoryStatus;
+  actual_word_count: number | null;
+  chapter_count: number;
+  created_at: string;
+}
+
 // ---------------------------------------------------------------------------
 // SSE event payloads
 // ---------------------------------------------------------------------------
