@@ -10,6 +10,7 @@ import type {
   ChapterListResponse,
   StoryCreateRequest,
   StoryListItem,
+  StoryListResponse,
   StoryResponse,
   StoryStatusResponse,
 } from "./types";
@@ -81,10 +82,16 @@ export async function getStoryStatus(storyId: string): Promise<StoryStatusRespon
 /**
  * GET /api/v1/stories/ — list all stories (lightweight cards).
  */
-export async function listStories(): Promise<StoryListItem[]> {
-  const res = await fetch(`${API_BASE}/stories/`);
+export async function listStories(
+  offset = 0,
+  limit = 50,
+): Promise<StoryListItem[]> {
+  const res = await fetch(
+    `${API_BASE}/stories/?offset=${offset}&limit=${limit}`,
+  );
   if (!res.ok) {
     throw new Error(`Failed to list stories (${res.status})`);
   }
-  return res.json() as Promise<StoryListItem[]>;
+  const data = (await res.json()) as StoryListResponse;
+  return data.items;
 }

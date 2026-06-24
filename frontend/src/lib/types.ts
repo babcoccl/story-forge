@@ -51,6 +51,14 @@ export interface StoryListItem {
   created_at: string;
 }
 
+/** Paginated envelope returned by GET /stories/ */
+export interface StoryListResponse {
+  total: number;
+  offset: number;
+  limit: number;
+  items: StoryListItem[];
+}
+
 // ---------------------------------------------------------------------------
 // SSE event payloads
 // ---------------------------------------------------------------------------
