@@ -105,6 +105,19 @@ class BaseAgent:
                         # Case C: unclosed <think> — extract everything after the tag
                         content = re.sub(r"<think>", "", content, flags=re.DOTALL).strip()
 
+                # Guard: if think-tag stripping resolved to empty, treat as a
+                # retriable failure rather than silently returning empty string.
+                if not content.strip():
+                    retry_count += 1
+                    last_error = AgentError(
+                        "LLM returned empty content after think-tag stripping"
+                    )
+                    if attempt < 3:
+                        await asyncio.sleep(2 ** (attempt - 1))
+                        continue
+                    else:
+                        break
+
                 latency_ms = int((time.time() - start_ms) * 1000)
 
                 usage = data.get("usage", {})

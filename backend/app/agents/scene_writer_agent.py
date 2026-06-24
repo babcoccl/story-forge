@@ -73,13 +73,26 @@ class SceneWriterAgent(BaseAgent):
         AgentError
             If all 3 attempts fail.
         """
-        user_message = self._build_user_message(context)
-        max_tokens = min( self._settings.llm_max_tokens, 32192 )
+        base_user_message = self._build_user_message(context)
+        max_tokens = min(self._settings.llm_max_tokens, 32192)
 
         max_attempts = 3
         last_error: Exception | None = None
 
         for attempt in range(1, max_attempts + 1):
+            # On retries, append explicit directive to break identical-prompt loop.
+            user_message = base_user_message
+            if attempt > 1:
+                user_message = (
+                    base_user_message
+                    + "\n\n[RETRY DIRECTIVE — attempt "
+                    + str(attempt)
+                    + " of "
+                    + str(max_attempts)
+                    + ": the previous attempt produced no output. "
+                    "You must write the full scene prose now. "
+                    "Do not output a thinking block. Output prose only.]"
+                )
             try:
                 prose = await self.call(
                     db=db,
