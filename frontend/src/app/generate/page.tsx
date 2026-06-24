@@ -26,7 +26,7 @@ import type {
 // Types
 // ---------------------------------------------------------------------------
 
-type PageState = "idle" | "submitting" | "generating" | "done" | "error";
+type PageState = "rehydrating" | "idle" | "submitting" | "generating" | "done" | "error";
 
 interface SceneEvent {
   chapterNumber: number;
@@ -90,7 +90,7 @@ export default function GeneratePage() {
   const [wordCount, setWordCount] = useState(15000);
 
   // Page state machine
-  const [pageState, setPageState] = useState<PageState>("idle");
+  const [pageState, setPageState] = useState<PageState>("rehydrating");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Generation progress
@@ -111,7 +111,10 @@ export default function GeneratePage() {
 
   useEffect(() => {
     const savedId = sessionStorage.getItem(ACTIVE_STORY_KEY);
-    if (!savedId) return;
+    if (!savedId) {
+      setPageState("idle");
+      return;
+    }
 
     getStoryStatus(savedId)
       .then((statusResp) => {
@@ -294,6 +297,28 @@ export default function GeneratePage() {
       <h1 className="mb-8 text-3xl font-bold tracking-tight text-gray-900">
         Generate Story
       </h1>
+
+      {/* ── REHYDRATING: Minimal spinner (no text) ── */}
+      {pageState === "rehydrating" && (
+        <div className="flex justify-center py-16">
+          <svg
+            className="h-10 w-10 animate-spin text-indigo-600"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12" cy="12" r="10"
+              stroke="currentColor" strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v8H4z"
+            />
+          </svg>
+        </div>
+      )}
 
       {/* ── IDLE: Generation form ── */}
       {pageState === "idle" && (
