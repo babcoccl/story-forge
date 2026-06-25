@@ -178,6 +178,11 @@ class SceneWriterAgent(BaseAgent):
             lines.append("Continuity State (what has actually happened so far):")
             lines.append(context.continuity_digest)
 
+        if context.previous_scene_closing:
+            lines.append("")
+            lines.append("Closing lines of the previous scene (maintain narrative flow):")
+            lines.append(context.previous_scene_closing)
+
         lines.append("")
         lines.append("Write the scene now. Output prose only — no headers, no commentary.")
         return "\n".join(lines)

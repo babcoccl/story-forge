@@ -211,6 +211,7 @@ class SceneContext(BaseModel):
     tone: str
     pacing_notes: str
     continuity_digest: str | None = None
+    previous_scene_closing: str | None = None
 
 
 class SceneOutput(BaseModel):

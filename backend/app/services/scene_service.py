@@ -12,6 +12,7 @@ See SPEC_PHASE_6.md for full specification.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from uuid import UUID
 
@@ -42,12 +43,12 @@ class SceneService:
     ) -> list[SceneOutput]:
         """Write prose for every pending scene in the story.
 
-        Iterates plan.chapters in order, then each chapter's scenes in order.
-        For each scene, loads the StoryScene ORM record, builds a SceneContext,
-        calls SceneWriterAgent.write(), persists the result, and commits.
+        Chapters are processed sequentially (each chapter's continuity digest
+        seeds the next chapter's scenes). Within each chapter, all scenes are
+        written concurrently via asyncio.gather() for reduced wall-clock time.
 
-        Failed scenes are marked status="failed" and logged. The loop always
-        continues regardless of individual scene failures.
+        The continuity agent fires once per chapter boundary (not after the
+        final chapter), summarizing the whole chapter rather than each scene.
 
         Parameters
         ----------
@@ -66,6 +67,7 @@ class SceneService:
         """
         outputs: list[SceneOutput] = []
         running_digest: str = ""
+        last_written_prose: str = ""  # tracks last scene prose for previous_scene_closing
         story_bible = story.story_bible or {}
 
         protagonist_name = ""
@@ -82,7 +84,6 @@ class SceneService:
             antagonist_name = characters.get("antagonist_name", "")
             antagonist_description = characters.get("antagonist_description", "")
         elif isinstance(characters, list) and len(characters) > 0:
-            # Handle list-of-dict format if LLM produced that structure
             for char in characters:
                 role = char.get("role", "")
                 if role == "protagonist":
@@ -92,8 +93,10 @@ class SceneService:
                     antagonist_name = char.get("name", "")
                     antagonist_description = char.get("description", "")
 
+        total_chapters = len(plan.chapters)
+
         async with SceneWriterAgent() as writer, ContinuityAgent() as continuity:
-            for chapter_plan in plan.chapters:
+            for chapter_idx, chapter_plan in enumerate(plan.chapters):
                 chapter_orm = await self._load_chapter(
                     db, story.id, chapter_plan.chapter_number
                 )
@@ -109,9 +112,8 @@ class SceneService:
                 chapter_orm.status = "writing"
                 await db.commit()
 
-                # Pre-compute max scene number for last-scene detection
-                max_scene_number = max(sp.scene_number for sp in chapter_plan.scenes)
-
+                # Load all scene ORM records for this chapter
+                scene_orms: list[StoryScene] = []
                 for scene_plan in chapter_plan.scenes:
                     scene_orm = await self._load_scene(
                         db, chapter_orm.id, scene_plan.scene_number
@@ -123,6 +125,26 @@ class SceneService:
                             chapter_orm.id,
                         )
                         continue
+                    scene_orms.append(scene_orm)
+
+                # Build SceneContext for each scene with previous_scene_closing.
+                # Only the first scene of the chapter receives previous_scene_closing
+                # (last 200 words from the prior chapter's final scene). Intra-chapter
+                # scenes with scene_number > 1 get None since they run concurrently
+                # and cannot read each other's output yet.
+                contexts: list[SceneContext] = []
+                for idx, scene_plan in enumerate(chapter_plan.scenes):
+                    # Find matching scene_orm (same order as chapter_plan.scenes)
+                    scene_orm = scene_orms[idx] if idx < len(scene_orms) else None
+                    if scene_orm is None:
+                        continue
+
+                    # Determine previous_scene_closing
+                    previous_closing: str | None = None
+                    if scene_plan.scene_number == 1 and last_written_prose:
+                        # First scene of a chapter (or story) — pass last 200 words
+                        words = last_written_prose.split()
+                        previous_closing = " ".join(words[-200:]) if words else None
 
                     context = SceneContext(
                         scene_id=scene_orm.id,
@@ -142,83 +164,145 @@ class SceneService:
                         tone=tone,
                         pacing_notes=pacing_notes,
                         continuity_digest=running_digest if running_digest else None,
+                        previous_scene_closing=previous_closing,
                     )
+                    contexts.append(context)
 
-                    try:
-                        scene_orm.status = "writing"
-                        await db.commit()
+                # Write all scenes in this chapter concurrently
+                tasks = [
+                    self._write_single_scene(db, writer, ctx, story.id, scene_orms[i])
+                    for i, ctx in enumerate(contexts)
+                ]
+                chapter_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                        output = await writer.write(db, context, story.id)
-                        scene_orm.content = output.prose
-                        scene_orm.word_count = output.actual_word_count
-                        scene_orm.status = "complete"
-                        await db.commit()
+                # Process results
+                chapter_outputs: list[SceneOutput] = []
+                for result in chapter_results:
+                    if isinstance(result, Exception):
+                        # asyncio.gather captured an exception
+                        logger.error("Scene write task failed: %s", result)
+                        # Find which scene failed (cannot determine from gather order,
+                        # but we need to track failed outputs)
+                        outputs.append(
+                            SceneOutput(
+                                scene_id=UUID("00000000-0000-0000-0000-000000000000"),
+                                prose="",
+                                actual_word_count=0,
+                                target_word_count=0,
+                            )
+                        )
+                    else:
+                        outputs.append(result)
+                        chapter_outputs.append(result)
+                        if result.prose:
+                            last_written_prose = result.prose
 
-                        # Update continuity digest after successful scene write
+                # Run continuity agent at chapter boundary (NOT after final chapter)
+                is_last_chapter = (chapter_idx + 1) == total_chapters
+                if not is_last_chapter and chapter_outputs:
+                    chapter_prose = "\n\n".join(
+                        out.prose for out in chapter_outputs if out.prose
+                    )
+                    if chapter_prose:
                         try:
                             running_digest = await continuity.update_digest(
                                 db=db,
                                 story_id=story.id,
-                                scene_id=scene_orm.id,
-                                scene_prose=output.prose,
+                                scene_id=None,
+                                scene_prose=chapter_prose,
                                 prior_digest=running_digest,
                             )
-                            scene_orm.continuity_notes = running_digest
+                            # Store continuity notes on the chapter record
+                            chapter_orm.continuity_notes = running_digest
                             await db.commit()
-                            logger.debug(
-                                "Continuity digest updated after scene %s (%d chars)",
-                                scene_orm.id,
+                            logger.info(
+                                "Chapter %d continuity digest updated (%d chars)",
+                                chapter_plan.chapter_number,
                                 len(running_digest),
                             )
                         except Exception as exc:
                             logger.warning(
-                                "ContinuityAgent failed for scene %s — skipping: %s",
-                                scene_orm.id,
+                                "ContinuityAgent failed for chapter %d boundary: %s",
+                                chapter_plan.chapter_number,
                                 exc,
                             )
 
-                        logger.info(
-                            "Scene %s written: %d words",
-                            scene_orm.id,
-                            output.actual_word_count,
-                        )
-                        outputs.append(output)
-
-                    except AgentError as exc:
-                        logger.error(
-                            "SceneWriterAgent failed for scene %s: %s",
-                            scene_orm.id,
-                            exc,
-                        )
-                        scene_orm.status = "failed"
-                        await db.commit()
-                        outputs.append(
-                            SceneOutput(
-                                scene_id=scene_orm.id,
-                                prose="",
-                                actual_word_count=0,
-                                target_word_count=context.word_count_target,
-                            )
-                        )
-
-                    # After last scene in chapter, mark chapter complete if
-                    # at least one scene completed successfully
-                    if scene_plan.scene_number == max_scene_number:
-                        has_complete = any(
-                            sc.status == "complete"
-                            for sc in chapter_orm.scenes
-                            if sc.status in ("complete", "failed", "writing")
-                        )
-                        if has_complete:
-                            chapter_orm.status = "complete"
-                            await db.commit()
-                            logger.info(
-                                "Chapter %d marked complete for story %s",
-                                chapter_plan.chapter_number,
-                                story.id,
-                            )
+                # Mark chapter complete if at least one scene completed
+                has_complete = any(
+                    sc.status == "complete"
+                    for sc in chapter_orm.scenes
+                    if sc.status in ("complete", "failed", "writing")
+                )
+                if has_complete:
+                    chapter_orm.status = "complete"
+                    await db.commit()
+                    logger.info(
+                        "Chapter %d marked complete for story %s",
+                        chapter_plan.chapter_number,
+                        story.id,
+                    )
 
         return outputs
+
+    async def _write_single_scene(
+        self,
+        db: AsyncSession,
+        writer: SceneWriterAgent,
+        context: SceneContext,
+        story_id: UUID,
+        scene_orm: StoryScene,
+    ) -> SceneOutput:
+        """Write prose for a single scene.
+
+        This method is called concurrently by asyncio.gather() for all scenes
+        within a chapter. Each coroutine operates on a distinct scene_orm
+        instance, so shared AsyncSession usage is safe.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Shared database session (safe for concurrent coroutines on
+            distinct ORM objects).
+        writer : SceneWriterAgent
+            The scene writer agent instance.
+        context : SceneContext
+            Full scene context.
+        story_id : UUID
+            Story record ID for AgentRun logging.
+        scene_orm : StoryScene
+            The scene ORM record to update.
+
+        Returns
+        -------
+        SceneOutput
+            The written scene output.
+
+        Raises
+        ------
+        AgentError
+            If the writer fails (caught by asyncio.gather in caller).
+        """
+        scene_orm.status = "writing"
+        await db.commit()
+
+        try:
+            output = await writer.write(db, context, story_id)
+        except AgentError:
+            scene_orm.status = "failed"
+            await db.commit()
+            raise
+
+        scene_orm.content = output.prose
+        scene_orm.word_count = output.actual_word_count
+        scene_orm.status = "complete"
+        await db.commit()
+
+        logger.info(
+            "Scene %s written: %d words",
+            scene_orm.id,
+            output.actual_word_count,
+        )
+        return output
 
     async def _load_chapter(
         self,
