@@ -7,7 +7,9 @@
  */
 
 import type {
+  AgentRunLogResponse,
   ChapterListResponse,
+  StoryCostResponse,
   StoryCreateRequest,
   StoryListItem,
   StoryListResponse,
@@ -94,4 +96,34 @@ export async function listStories(
   }
   const data = (await res.json()) as StoryListResponse;
   return data.items;
+}
+
+/**
+ * GET /api/v1/stories/{storyId}/cost
+ * Returns aggregated token usage and optional cost estimate.
+ */
+export async function getStoryCost(storyId: string): Promise<StoryCostResponse> {
+  const res = await fetch(`${API_BASE}/stories/${storyId}/cost`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch cost data (${res.status})`);
+  }
+  return res.json() as Promise<StoryCostResponse>;
+}
+
+/**
+ * GET /api/v1/stories/{storyId}/agent-runs
+ * Returns paginated AgentRun log for a story.
+ */
+export async function getAgentRuns(
+  storyId: string,
+  offset = 0,
+  limit = 50,
+): Promise<AgentRunLogResponse> {
+  const res = await fetch(
+    `${API_BASE}/stories/${storyId}/agent-runs?offset=${offset}&limit=${limit}`,
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to fetch agent runs (${res.status})`);
+  }
+  return res.json() as Promise<AgentRunLogResponse>;
 }

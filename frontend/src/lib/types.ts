@@ -125,12 +125,56 @@ export interface ChapterListResponse {
   chapters: ChapterResponse[];
 }
 
-/** Lightweight status check for polling during generation */
+// ---------------------------------------------------------------------------
+// Status endpoint (Phase 9a)
+// ---------------------------------------------------------------------------
+
 export interface StoryStatusResponse {
-  id: string;
+  story_id: string;
   status: StoryStatus;
-  title: string | null;
+  chapter_count: number;
+  scene_count: number;
   actual_word_count: number | null;
   error_message: string | null;
-  chapter_statuses: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: Agent observability types
+// ---------------------------------------------------------------------------
+
+export interface AgentTokenBreakdown {
+  agent_name: string;
+  call_count: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  estimated_cost_usd: number | null;
+}
+
+export interface StoryCostResponse {
+  story_id: string;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  estimated_cost_usd: number | null;
+  breakdown: AgentTokenBreakdown[];
+}
+
+export interface AgentRunLogItem {
+  id: string;
+  agent_name: string;
+  status: string;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  latency_ms: number | null;
+  retry_count: number;
+  created_at: string;
+}
+
+export interface AgentRunLogResponse {
+  story_id: string;
+  total: number;
+  offset: number;
+  limit: number;
+  items: AgentRunLogItem[];
 }

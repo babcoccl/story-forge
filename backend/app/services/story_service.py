@@ -26,12 +26,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.app.agents.planner_agent import PlannerAgent
+from backend.app.config import get_settings
 from backend.app.db.session import AsyncSessionLocal
 from backend.app.models.story import Story, StoryChapter, StoryComponentLink, StoryScene
 from backend.app.schemas.sampler import BundleItem, SampleRequest
 from backend.app.schemas.story import RerollRequest, StoryCreateRequest, StoryPlan
 from backend.app.services.chapter_service import ChapterService
 from backend.app.services.reroll_service import RerollService
+from backend.app.services.revision_service import RevisionService
 from backend.app.services.scene_service import SceneService
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,7 @@ class StoryService:
         self._planner = PlannerAgent()
         self._scene_service = SceneService()
         self._chapter_service = ChapterService()
+        self._revision_service = RevisionService()
 
     # ------------------------------------------------------------------
     # Public API — fast path (returns immediately)
@@ -386,6 +389,26 @@ class StoryService:
         # Step 7: Write scene prose via SceneWriterAgent
         logger.info("Starting scene writing for story %s", story.id)
         await self._scene_service.write_all_scenes(db, story, plan)
+
+        # Step 7.5: Prose quality revision loop
+        story.status = "reviewing"
+        await db.commit()
+        logger.info("Starting prose revision loop for story %s", story.id)
+        settings = get_settings()
+        try:
+            await self._revision_service.run_revision_loop(
+                db=db,
+                story=story,
+                threshold=settings.prose_quality_threshold,
+                max_revisions=settings.max_scene_revisions,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Revision loop encountered an error for story %s — "
+                "continuing to assembly: %s",
+                story.id,
+                exc,
+            )
 
         # Step 8: Assemble chapter content
         logger.info("Assembling chapters for story %s", story.id)

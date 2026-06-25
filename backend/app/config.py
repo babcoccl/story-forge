@@ -29,8 +29,14 @@ class Settings(BaseSettings):
     llm_timeout: float = 120.0
     max_scene_retries: int = 3
     max_combination_retries: int = 15
+    prose_quality_threshold: float = 0.72
+    max_scene_revisions: int = 2
     target_words_per_scene: int = 1500
     log_level: str = "INFO"
+
+    # Token cost estimation — set to $ per million tokens for cost display.
+    # When 0.0 (default), cost display is hidden in the UI.
+    cost_per_million_tokens: float = 0.0
 
     # CORS — comma-separated list of allowed origins.
     # Default permits the Next.js dev server and localhost variants.

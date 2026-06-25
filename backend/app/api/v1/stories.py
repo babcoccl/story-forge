@@ -21,7 +21,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.app.db.session import AsyncSessionLocal
+from backend.app.models.agent import AgentRun
 from backend.app.models.story import Story, StoryChapter
+from backend.app.schemas.agent import (
+    AgentRunLogItem,
+    AgentRunLogResponse,
+    AgentTokenBreakdown,
+    StoryCostResponse,
+)
 from backend.app.schemas.story import (
     ChapterStatusItem,
     RerollRequest,
@@ -292,6 +299,139 @@ async def get_story_status(
         actual_word_count=story.actual_word_count,
         error_message=story.error_message,
         chapter_statuses=chapter_statuses,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 11: Token cost aggregation
+# ---------------------------------------------------------------------------
+
+@router.get("/{story_id}/cost", response_model=StoryCostResponse)
+async def get_story_cost(
+    story_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> StoryCostResponse:
+    """Return aggregated token usage and optional cost estimate for a story.
+
+    Aggregates prompt_tokens and completion_tokens from all AgentRun records
+    for the story, grouped by agent_name. Cost estimation is enabled only
+    when COST_PER_MILLION_TOKENS > 0 in settings.
+
+    Returns 404 if the story does not exist.
+    Returns an empty breakdown (all zeros) if no AgentRun records exist yet.
+    """
+    from backend.app.config import get_settings
+    settings = get_settings()
+
+    # Verify story exists
+    story_check = await db.execute(select(Story.id).where(Story.id == story_id))
+    if story_check.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Story {story_id} not found",
+        )
+
+    # Aggregate by agent_name
+    stmt = (
+        select(
+            AgentRun.agent_name,
+            func.count(AgentRun.id).label("call_count"),
+            func.coalesce(func.sum(AgentRun.prompt_tokens), 0).label("prompt_tokens"),
+            func.coalesce(func.sum(AgentRun.completion_tokens), 0).label("completion_tokens"),
+        )
+        .where(AgentRun.story_id == story_id)
+        .group_by(AgentRun.agent_name)
+        .order_by(AgentRun.agent_name)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    rate = settings.cost_per_million_tokens
+    breakdown: list[AgentTokenBreakdown] = []
+    for row in rows:
+        total = row.prompt_tokens + row.completion_tokens
+        cost = (total / 1_000_000 * rate) if rate > 0 else None
+        breakdown.append(
+            AgentTokenBreakdown(
+                agent_name=row.agent_name,
+                call_count=row.call_count,
+                prompt_tokens=row.prompt_tokens,
+                completion_tokens=row.completion_tokens,
+                total_tokens=total,
+                estimated_cost_usd=cost,
+            )
+        )
+
+    total_prompt = sum(b.prompt_tokens for b in breakdown)
+    total_completion = sum(b.completion_tokens for b in breakdown)
+    total_tokens = total_prompt + total_completion
+    total_cost = (total_tokens / 1_000_000 * rate) if rate > 0 else None
+
+    return StoryCostResponse(
+        story_id=story_id,
+        total_prompt_tokens=total_prompt,
+        total_completion_tokens=total_completion,
+        total_tokens=total_tokens,
+        estimated_cost_usd=total_cost,
+        breakdown=breakdown,
+    )
+
+
+@router.get("/{story_id}/agent-runs", response_model=AgentRunLogResponse)
+async def get_story_agent_runs(
+    story_id: UUID,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> AgentRunLogResponse:
+    """Return paginated AgentRun log for a story, ordered by created_at asc.
+
+    Returns 404 if the story does not exist.
+    Returns empty items list if no runs exist yet.
+    """
+    # Verify story exists
+    story_check = await db.execute(select(Story.id).where(Story.id == story_id))
+    if story_check.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Story {story_id} not found",
+        )
+
+    count_result = await db.execute(
+        select(func.count(AgentRun.id)).where(AgentRun.story_id == story_id)
+    )
+    total = count_result.scalar_one()
+
+    stmt = (
+        select(AgentRun)
+        .where(AgentRun.story_id == story_id)
+        .order_by(AgentRun.created_at.asc())
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    runs = result.scalars().all()
+
+    items = [
+        AgentRunLogItem(
+            id=run.id,
+            agent_name=run.agent_name,
+            status=run.status,
+            prompt_tokens=run.prompt_tokens,
+            completion_tokens=run.completion_tokens,
+            latency_ms=run.latency_ms,
+            retry_count=run.retry_count,
+            created_at=run.created_at,
+        )
+        for run in runs
+    ]
+
+    return AgentRunLogResponse(
+        story_id=story_id,
+        total=total,
+        offset=offset,
+        limit=limit,
+        items=items,
     )
 
 
