@@ -13,12 +13,19 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getAgentRuns, getChapters, getStory, getStoryCost } from "@/lib/api";
+import {
+  getAgentRuns,
+  getChapters,
+  getStory,
+  getStoryCost,
+  getStoryPerformance,
+} from "@/lib/api";
 import type {
   AgentRunLogItem,
   ChapterListResponse,
   SceneResponse,
   StoryCostResponse,
+  StoryPerformanceResponse,
   StoryStatus,
 } from "@/lib/types";
 
@@ -198,6 +205,200 @@ function TokenSummaryPanel({ cost }: { cost: StoryCostResponse }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Performance panel
+// ---------------------------------------------------------------------------
+
+function fmtMs(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function fmtDuration(ms: number | null): string {
+  if (ms == null) return "—";
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+function PerformancePanel({ perf }: { perf: StoryPerformanceResponse }) {
+  const revisedCount = perf.scene_timings.filter((s) => s.was_revised).length;
+  const totalCount = perf.scene_timings.length;
+
+  return (
+    <CollapsiblePanel title="Performance">
+      {/* Wall-clock summary */}
+      <div className="mb-6 flex flex-wrap gap-6 text-sm">
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Total time</p>
+          <p className="font-semibold text-gray-900">{fmtDuration(perf.total_wall_clock_ms)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">LLM time</p>
+          <p className="font-semibold text-gray-900">{fmtDuration(perf.total_llm_ms)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Overhead</p>
+          <p className="font-semibold text-gray-900">{fmtDuration(perf.overhead_ms)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Scenes revised</p>
+          <p className="font-semibold text-gray-900">
+            {revisedCount} / {totalCount}
+          </p>
+        </div>
+      </div>
+
+      {/* Pipeline stage summary */}
+      {perf.stage_summary.length > 0 && (
+        <div className="mb-6">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Pipeline Stages
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-gray-100 text-gray-500 uppercase tracking-wide">
+                  <th className="pb-2 pr-4">Agent</th>
+                  <th className="pb-2 pr-4 text-right">Calls</th>
+                  <th className="pb-2 pr-4 text-right">Total</th>
+                  <th className="pb-2 pr-4 text-right">Avg</th>
+                  <th className="pb-2 pr-4 text-right">Min</th>
+                  <th className="pb-2 pr-4 text-right">Max</th>
+                  <th className="pb-2 text-right">% of LLM</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perf.stage_summary.map((row) => (
+                  <tr key={row.agent_name} className="border-b border-gray-50">
+                    <td className="py-1.5 pr-4 font-medium text-gray-700">
+                      {row.agent_name}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {row.call_count}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {fmtMs(row.total_ms)}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {fmtMs(row.avg_ms)}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {fmtMs(row.min_ms)}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {fmtMs(row.max_ms)}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-gray-500">
+                          {row.pct_of_total_llm_time.toFixed(1)}%
+                        </span>
+                        <div className="h-1.5 w-full max-w-[80px] rounded bg-gray-100">
+                          <div
+                            className="h-1.5 rounded bg-indigo-400"
+                            style={{
+                              width: `${Math.min(row.pct_of_total_llm_time, 100)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Per-scene timing table */}
+      {perf.scene_timings.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Per-Scene Timings
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-gray-100 text-gray-500 uppercase tracking-wide">
+                  <th className="pb-2 pr-4">Scene</th>
+                  <th className="pb-2 pr-4 text-right">Writer</th>
+                  <th className="pb-2 pr-4 text-right">Continuity</th>
+                  <th className="pb-2 pr-4 text-right">Judge₁</th>
+                  <th className="pb-2 pr-4 text-right">Wordsmith</th>
+                  <th className="pb-2 pr-4 text-right">Judge₂</th>
+                  <th className="pb-2 pr-4 text-right">Total</th>
+                  <th className="pb-2 text-right">Revised</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perf.scene_timings.map((scene) => (
+                  <tr
+                    key={scene.scene_id}
+                    className={`border-b border-gray-50 ${
+                      scene.was_revised ? "bg-amber-50" : ""
+                    }`}
+                  >
+                    <td className="py-1.5 pr-4 font-medium text-gray-700">
+                      Ch{scene.chapter_number} S{scene.scene_number}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {scene.scene_writer_ms != null
+                        ? fmtMs(scene.scene_writer_ms)
+                        : "—"}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {scene.continuity_ms != null
+                        ? fmtMs(scene.continuity_ms)
+                        : "—"}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {scene.prose_judge_first_ms != null
+                        ? fmtMs(scene.prose_judge_first_ms)
+                        : "—"}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {scene.wordsmith_ms != null
+                        ? fmtMs(scene.wordsmith_ms)
+                        : "—"}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right text-gray-500">
+                      {scene.prose_judge_second_ms != null
+                        ? fmtMs(scene.prose_judge_second_ms)
+                        : "—"}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right font-medium text-gray-700">
+                      {fmtMs(scene.total_scene_llm_ms)}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {scene.was_revised ? (
+                        <span className="text-green-600">✓</span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {perf.scene_timings.length === 0 && perf.stage_summary.length === 0 && (
+        <p className="text-xs text-gray-400">No performance data available yet.</p>
+      )}
+    </CollapsiblePanel>
+  );
+}
+
 function AgentRunLogPanel({ runs }: { runs: AgentRunLogItem[] }) {
   return (
     <CollapsiblePanel title={`Agent Run Log (${runs.length})`}>
@@ -280,6 +481,7 @@ export default function StoryReaderPage() {
   const [error, setError] = useState<string | null>(null);
   const [cost, setCost] = useState<StoryCostResponse | null>(null);
   const [agentRuns, setAgentRuns] = useState<AgentRunLogItem[]>([]);
+  const [perf, setPerf] = useState<StoryPerformanceResponse | null>(null);
 
   // ---------------------------------------------------------------------------
   // Initial load
@@ -305,6 +507,9 @@ export default function StoryReaderPage() {
           .catch(() => undefined);
         getAgentRuns(storyId)
           .then((r) => { if (!cancelled) setAgentRuns(r.items); })
+          .catch(() => undefined);
+        getStoryPerformance(storyId)
+          .then((p) => { if (!cancelled) setPerf(p); })
           .catch(() => undefined);
       } catch (err) {
         if (!cancelled) {
@@ -434,6 +639,7 @@ export default function StoryReaderPage() {
       {/* Observability panels */}
       {!error && (
         <div className="mt-12 space-y-3">
+          {perf !== null && <PerformancePanel perf={perf} />}
           {cost !== null && <TokenSummaryPanel cost={cost} />}
           <AgentRunLogPanel runs={agentRuns} />
         </div>

@@ -20,14 +20,17 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.app.db.session import AsyncSessionLocal
+from backend.app.db.session import get_db
 from backend.app.models.agent import AgentRun
 from backend.app.models.story import Story, StoryChapter
 from backend.app.schemas.agent import (
     AgentRunLogItem,
     AgentRunLogResponse,
+    AgentStageSummary,
     AgentTokenBreakdown,
+    SceneTimingItem,
     StoryCostResponse,
+    StoryPerformanceResponse,
 )
 from backend.app.schemas.story import (
     ChapterStatusItem,
@@ -42,15 +45,6 @@ from backend.app.schemas.story import (
 from backend.app.services.story_service import StoryService
 
 router = APIRouter(prefix="/stories", tags=["stories"])
-
-
-def get_db() -> AsyncSession:
-    """Provide a database session for dependency injection."""
-    session = AsyncSessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 # ---------------------------------------------------------------------------
@@ -432,6 +426,175 @@ async def get_story_agent_runs(
         offset=offset,
         limit=limit,
         items=items,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 13a: Performance observability
+# ---------------------------------------------------------------------------
+
+@router.get("/{story_id}/performance", response_model=StoryPerformanceResponse)
+async def get_story_performance(
+    story_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> StoryPerformanceResponse:
+    """Return wall-clock and per-scene LLM timing breakdown for a story.
+
+    All data is derived from existing agent_runs rows (agent_name, latency_ms,
+    created_at, scene_id). No new database columns or migrations required.
+
+    Returns 404 if the story does not exist.
+    Returns empty arrays and null wall-clock if no agent runs exist yet.
+    """
+    # Verify story exists
+    story_check = await db.execute(select(Story.id).where(Story.id == story_id))
+    if story_check.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Story {story_id} not found",
+        )
+
+    # Load all agent runs ordered by created_at ascending
+    runs_stmt = (
+        select(AgentRun)
+        .where(AgentRun.story_id == story_id)
+        .order_by(AgentRun.created_at.asc())
+    )
+    runs_result = await db.execute(runs_stmt)
+    all_runs = runs_result.scalars().all()
+
+    # Load all StoryScene records with chapter info and revision_count
+    scenes_stmt = (
+        select(StoryChapter, StoryChapter.scenes)
+        .where(StoryChapter.story_id == story_id)
+        .options(selectinload(StoryChapter.scenes))
+        .order_by(StoryChapter.chapter_number.asc())
+    )
+    scenes_result = await db.execute(scenes_stmt)
+    chapters_rows = scenes_result.scalars().all()
+
+    # Build scene_id -> (chapter_number, scene_number, revision_count) map
+    scene_map: dict[str, tuple[int, int, int]] = {}
+    for chapter in chapters_rows:
+        for scene in (chapter.scenes or []):
+            scene_map[str(scene.id)] = (
+                chapter.chapter_number,
+                scene.scene_number,
+                scene.revision_count,
+            )
+
+    # --- Compute totals ---
+    total_llm_ms: int = sum(r.latency_ms or 0 for r in all_runs)
+
+    total_wall_clock_ms: int | None = None
+    if all_runs:
+        first_run = all_runs[0]
+        last_run = all_runs[-1]
+        wall_clock = (last_run.created_at - first_run.created_at).total_seconds() * 1000
+        wall_clock += last_run.latency_ms or 0
+        total_wall_clock_ms = int(wall_clock)
+
+    overhead_ms: int | None = None
+    if total_wall_clock_ms is not None:
+        overhead_ms = total_wall_clock_ms - total_llm_ms
+
+    # --- Build scene_timings ---
+    # Group runs by scene_id
+    from collections import defaultdict
+    runs_by_scene: dict[str, list[AgentRun]] = defaultdict(list)
+    for run in all_runs:
+        if run.scene_id is not None:
+            runs_by_scene[str(run.scene_id)].append(run)
+
+    scene_timings: list[SceneTimingItem] = []
+    for sid, scene_runs in runs_by_scene.items():
+        # Look up in scene_map
+        if sid not in scene_map:
+            # Orphaned run — skip with debug log
+            continue
+
+        chapter_number, scene_number, revision_count = scene_map[sid]
+
+        # Find latencies by agent_name
+        def get_latency(name: str) -> int | None:
+            return next(
+                (r.latency_ms for r in scene_runs if r.agent_name == name and r.latency_ms is not None),
+                None,
+            )
+
+        # prose_judge can have two runs per scene
+        judge_runs = [
+            r for r in scene_runs if r.agent_name == "prose_judge" and r.latency_ms is not None
+        ]
+        prose_judge_first_ms = judge_runs[0].latency_ms if len(judge_runs) >= 1 else None
+        prose_judge_second_ms = judge_runs[1].latency_ms if len(judge_runs) >= 2 else None
+
+        scene_writer_ms = get_latency("scene_writer")
+        continuity_ms = get_latency("continuity")
+        wordsmith_ms = get_latency("wordsmith")
+
+        total_scene_llm_ms = sum(
+            r.latency_ms or 0 for r in scene_runs
+        )
+
+        scene_timings.append(
+            SceneTimingItem(
+                scene_id=sid,
+                chapter_number=chapter_number,
+                scene_number=scene_number,
+                scene_writer_ms=scene_writer_ms,
+                continuity_ms=continuity_ms,
+                prose_judge_first_ms=prose_judge_first_ms,
+                wordsmith_ms=wordsmith_ms,
+                prose_judge_second_ms=prose_judge_second_ms,
+                total_scene_llm_ms=total_scene_llm_ms,
+                was_revised=revision_count > 0,
+            )
+        )
+
+    # Sort by (chapter_number, scene_number)
+    scene_timings.sort(key=lambda s: (s.chapter_number, s.scene_number))
+
+    # --- Build stage_summary ---
+    runs_by_agent: dict[str, list[AgentRun]] = defaultdict(list)
+    for run in all_runs:
+        runs_by_agent[run.agent_name].append(run)
+
+    stage_summary: list[AgentStageSummary] = []
+    for agent_name, agent_runs in runs_by_agent.items():
+        latencies = [r.latency_ms for r in agent_runs if r.latency_ms is not None]
+        if not latencies:
+            continue  # skip agents with no non-null latencies
+
+        call_count = len(agent_runs)
+        total_ms = sum(latencies)
+        avg_ms = int(total_ms / len(latencies))
+        min_ms = min(latencies)
+        max_ms = max(latencies)
+        pct = (total_ms / total_llm_ms * 100) if total_llm_ms > 0 else 0.0
+
+        stage_summary.append(
+            AgentStageSummary(
+                agent_name=agent_name,
+                call_count=call_count,
+                total_ms=total_ms,
+                avg_ms=avg_ms,
+                min_ms=min_ms,
+                max_ms=max_ms,
+                pct_of_total_llm_time=pct,
+            )
+        )
+
+    # Sort by total_ms descending
+    stage_summary.sort(key=lambda s: s.total_ms, reverse=True)
+
+    return StoryPerformanceResponse(
+        story_id=story_id,
+        total_wall_clock_ms=total_wall_clock_ms,
+        total_llm_ms=total_llm_ms,
+        overhead_ms=overhead_ms,
+        scene_timings=scene_timings,
+        stage_summary=stage_summary,
     )
 
 

@@ -6,7 +6,40 @@
 // ---------------------------------------------------------------------------
 // Story schemas
 // ---------------------------------------------------------------------------
+// Phase 13a: Performance observability types
+// ---------------------------------------------------------------------------
 
+export interface SceneTimingItem {
+  scene_id: string;
+  chapter_number: number;
+  scene_number: number;
+  scene_writer_ms: number | null;
+  continuity_ms: number | null;
+  prose_judge_first_ms: number | null;
+  wordsmith_ms: number | null;
+  prose_judge_second_ms: number | null;
+  total_scene_llm_ms: number;
+  was_revised: boolean;
+}
+
+export interface AgentStageSummary {
+  agent_name: string;
+  call_count: number;
+  total_ms: number;
+  avg_ms: number;
+  min_ms: number;
+  max_ms: number;
+  pct_of_total_llm_time: number;
+}
+
+export interface StoryPerformanceResponse {
+  story_id: string;
+  total_wall_clock_ms: number | null;
+  total_llm_ms: number;
+  overhead_ms: number | null;
+  scene_timings: SceneTimingItem[];
+  stage_summary: AgentStageSummary[];
+}
 export type StoryMode = "standalone" | "continuation";
 
 export type StoryStatus =
@@ -178,3 +211,5 @@ export interface AgentRunLogResponse {
   limit: number;
   items: AgentRunLogItem[];
 }
+
+// ---------------------------------------------------------------------------

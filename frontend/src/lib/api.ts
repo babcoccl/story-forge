@@ -13,6 +13,7 @@ import type {
   StoryCreateRequest,
   StoryListItem,
   StoryListResponse,
+  StoryPerformanceResponse,
   StoryResponse,
   StoryStatusResponse,
 } from "./types";
@@ -126,4 +127,18 @@ export async function getAgentRuns(
     throw new Error(`Failed to fetch agent runs (${res.status})`);
   }
   return res.json() as Promise<AgentRunLogResponse>;
+}
+
+/**
+ * GET /api/v1/stories/{storyId}/performance
+ * Returns wall-clock and per-scene LLM timing breakdown.
+ */
+export async function getStoryPerformance(
+  storyId: string,
+): Promise<StoryPerformanceResponse> {
+  const res = await fetch(`${API_BASE}/stories/${storyId}/performance`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch performance data (${res.status})`);
+  }
+  return res.json() as Promise<StoryPerformanceResponse>;
 }
