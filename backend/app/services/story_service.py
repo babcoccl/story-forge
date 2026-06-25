@@ -127,22 +127,20 @@ class StoryService:
         None
             Result is persisted to the database, not returned to the caller.
         """
-        db = AsyncSessionLocal()
-        try:
-            story = await self.get_story_by_id(db, story_id)
-            if story is None:
-                logger.error("run_pipeline: story %s not found", story_id)
-                return
+        async with AsyncSessionLocal() as db:
+            try:
+                story = await self.get_story_by_id(db, story_id)
+                if story is None:
+                    logger.error("run_pipeline: story %s not found", story_id)
+                    return
 
-            await self._execute_pipeline(db, story, request)
-        except Exception as exc:
-            logger.error("Pipeline failed for story %s: %s", story_id, exc)
-            story = await self.get_story_by_id(db, story_id)
-            if story is not None:
-                await self._mark_failed(db, story, str(exc))
-            raise
-        finally:
-            await db.close()
+                await self._execute_pipeline(db, story, request)
+            except Exception as exc:
+                logger.error("Pipeline failed for story %s: %s", story_id, exc)
+                story = await self.get_story_by_id(db, story_id)
+                if story is not None:
+                    await self._mark_failed(db, story, str(exc))
+                raise
 
     # ------------------------------------------------------------------
     # Public API — legacy (direct call with caller-provided session)
@@ -199,46 +197,44 @@ class StoryService:
         None
             Result is persisted to the database.
         """
-        db = AsyncSessionLocal()
-        try:
-            story = await self.get_story_by_id(db, story_id)
-            if story is None:
-                logger.error("reroll_story: story %s not found", story_id)
-                return
+        async with AsyncSessionLocal() as db:
+            try:
+                story = await self.get_story_by_id(db, story_id)
+                if story is None:
+                    logger.error("reroll_story: story %s not found", story_id)
+                    return
 
-            target_word_count = request.target_word_count or story.target_word_count
+                target_word_count = request.target_word_count or story.target_word_count
 
-            # Clear existing pipeline data
-            await self._delete_existing_pipeline_data(db, story.id)
+                # Clear existing pipeline data
+                await self._delete_existing_pipeline_data(db, story.id)
 
-            # Reset story state
-            story.status = "planning"
-            story.error_message = None
-            story.title = None
-            story.synopsis = None
-            story.generation_seed = None
-            story.story_bible = None
-            story.actual_word_count = None
-            story.target_word_count = target_word_count
-            await db.commit()
+                # Reset story state
+                story.status = "planning"
+                story.error_message = None
+                story.title = None
+                story.synopsis = None
+                story.generation_seed = None
+                story.story_bible = None
+                story.actual_word_count = None
+                story.target_word_count = target_word_count
+                await db.commit()
 
-            # Build a StoryCreateRequest-compatible object for the pipeline
-            create_request = StoryCreateRequest(
-                mode=story.mode,
-                seed=request.seed,
-                overrides=request.overrides,
-                target_word_count=target_word_count,
-            )
+                # Build a StoryCreateRequest-compatible object for the pipeline
+                create_request = StoryCreateRequest(
+                    mode=story.mode,
+                    seed=request.seed,
+                    overrides=request.overrides,
+                    target_word_count=target_word_count,
+                )
 
-            await self._execute_pipeline(db, story, create_request)
-        except Exception as exc:
-            logger.error("Reroll failed for story %s: %s", story_id, exc)
-            story = await self.get_story_by_id(db, story_id)
-            if story is not None:
-                await self._mark_failed(db, story, str(exc))
-            raise
-        finally:
-            await db.close()
+                await self._execute_pipeline(db, story, create_request)
+            except Exception as exc:
+                logger.error("Reroll failed for story %s: %s", story_id, exc)
+                story = await self.get_story_by_id(db, story_id)
+                if story is not None:
+                    await self._mark_failed(db, story, str(exc))
+                raise
 
     async def reroll_story_sync(
         self,
