@@ -30,7 +30,9 @@ class BaseAgent:
     agent_name: str = "base"
     system_prompt: str = ""
 
-    def __init__(self) -> None:
+    def __init__(self, system_prompt: str | None = None) -> None:
+        if system_prompt is not None:
+            self.system_prompt = system_prompt
         s = get_settings()
         self._client = httpx.AsyncClient(
             base_url=s.llm_base_url,
