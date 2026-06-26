@@ -208,6 +208,41 @@ class BaseAgent:
         if not raw:
             raise AgentError("LLM returned empty response after stripping think tags")
 
+        # Extract the first complete JSON object — handles models that append
+        # extra text or a second block after the closing brace.
+        brace_start = raw.find("{")
+        if brace_start == -1:
+            raise AgentError(f"No JSON object found in LLM response: {raw[:200]}")
+
+        depth = 0
+        json_end = -1
+        in_string = False
+        escape_next = False
+        for i, ch in enumerate(raw[brace_start:], start=brace_start):
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == "\\" and in_string:
+                escape_next = True
+                continue
+            if ch == "\"":
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    json_end = i + 1
+                    break
+
+        if json_end == -1:
+            raise AgentError(f"Unclosed JSON object in LLM response: {raw[:200]}")
+
+        raw = raw[brace_start:json_end]
+
         try:
             result = json.loads(raw)
         except json.JSONDecodeError as exc:

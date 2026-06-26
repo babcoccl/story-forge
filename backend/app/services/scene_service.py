@@ -23,6 +23,7 @@ from sqlalchemy.orm import selectinload
 from backend.app.agents.base_agent import AgentError
 from backend.app.agents.continuity_agent import ContinuityAgent
 from backend.app.agents.scene_writer_agent import SceneWriterAgent
+from backend.app.db.session import AsyncSessionLocal
 from backend.app.models.story import Story, StoryChapter, StoryScene
 from backend.app.schemas.story import SceneContext, SceneOutput, StoryPlan
 
@@ -170,7 +171,7 @@ class SceneService:
 
                 # Write all scenes in this chapter concurrently
                 tasks = [
-                    self._write_single_scene(db, writer, ctx, story.id, scene_orms[i])
+                    self._write_single_scene(writer, ctx, story.id, scene_orms[i].id)
                     for i, ctx in enumerate(contexts)
                 ]
                 chapter_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -246,31 +247,27 @@ class SceneService:
 
     async def _write_single_scene(
         self,
-        db: AsyncSession,
         writer: SceneWriterAgent,
         context: SceneContext,
         story_id: UUID,
-        scene_orm: StoryScene,
+        scene_id: UUID,
     ) -> SceneOutput:
-        """Write prose for a single scene.
+        """Write prose for a single scene using an isolated database session.
 
-        This method is called concurrently by asyncio.gather() for all scenes
-        within a chapter. Each coroutine operates on a distinct scene_orm
-        instance, so shared AsyncSession usage is safe.
+        Each coroutine opens its own AsyncSessionLocal() to avoid concurrent
+        access to a shared session's transaction state machine, which corrupts
+        when multiple coroutines call await session.commit() simultaneously.
 
         Parameters
         ----------
-        db : AsyncSession
-            Shared database session (safe for concurrent coroutines on
-            distinct ORM objects).
         writer : SceneWriterAgent
             The scene writer agent instance.
         context : SceneContext
             Full scene context.
         story_id : UUID
             Story record ID for AgentRun logging.
-        scene_orm : StoryScene
-            The scene ORM record to update.
+        scene_id : UUID
+            The scene record ID to load and update.
 
         Returns
         -------
@@ -282,27 +279,34 @@ class SceneService:
         AgentError
             If the writer fails (caught by asyncio.gather in caller).
         """
-        scene_orm.status = "writing"
-        await db.commit()
+        async with AsyncSessionLocal() as session:
+            scene_orm = await session.get(StoryScene, scene_id)
+            if scene_orm is None:
+                raise AgentError(f"Scene {scene_id} not found")
 
-        try:
-            output = await writer.write(db, context, story_id)
-        except AgentError:
-            scene_orm.status = "failed"
-            await db.commit()
-            raise
+            scene_orm.status = "writing"
+            await session.commit()
 
-        scene_orm.content = output.prose
-        scene_orm.word_count = output.actual_word_count
-        scene_orm.status = "complete"
-        await db.commit()
+            try:
+                output = await writer.write(session, context, story_id)
+            except AgentError:
+                scene_orm = await session.get(StoryScene, scene_id)
+                scene_orm.status = "failed"
+                await session.commit()
+                raise
 
-        logger.info(
-            "Scene %s written: %d words",
-            scene_orm.id,
-            output.actual_word_count,
-        )
-        return output
+            scene_orm = await session.get(StoryScene, scene_id)
+            scene_orm.content = output.prose
+            scene_orm.word_count = output.actual_word_count
+            scene_orm.status = "complete"
+            await session.commit()
+
+            logger.info(
+                "Scene %s written: %d words",
+                scene_id,
+                output.actual_word_count,
+            )
+            return output
 
     async def _load_chapter(
         self,
