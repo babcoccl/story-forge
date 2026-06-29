@@ -369,7 +369,9 @@ class StoryService:
         story.status = "writing"
 
         # Step 6: Create chapter and scene records
-        await self._create_chapters_and_scenes(db, story.id, plan)
+        await self._create_chapters_and_scenes(
+            db, story.id, plan, request.target_word_count
+        )
 
         await db.commit()
 
@@ -490,10 +492,21 @@ class StoryService:
         db: AsyncSession,
         story_id: UUID,
         plan: StoryPlan,
+        target_word_count: int,
     ) -> None:
-        """Create StoryChapter and StoryScene records from the plan."""
-        total_scenes = 0
+        """Create StoryChapter and StoryScene records from the plan.
+
+        Computes ``words_per_scene`` deterministically from the total number of
+        actual scenes in the plan, clamped to a minimum floor defined in config.
+        """
+        total_scenes = sum(len(ch.scenes) for ch in plan.chapters)
         settings = get_settings()
+        words_per_scene = max(
+            target_word_count // total_scenes if total_scenes else 1250,
+            settings.min_words_per_scene,
+        )
+
+        total_scenes_created = 0
 
         for chapter_plan in plan.chapters:
             chapter = StoryChapter(
@@ -513,15 +526,10 @@ class StoryService:
                     scene_number=scene_plan.scene_number,
                     beat=beat,
                     status="pending",
-                    word_count=scene_plan.word_count_target,
-                )
-                # Normalize: cap at target_words_per_scene, floor at 800
-                scene.word_count = min(
-                    max(scene.word_count, 800),
-                    settings.target_words_per_scene,
+                    word_count=words_per_scene,
                 )
                 db.add(scene)
-                total_scenes += 1
+                total_scenes_created += 1
 
         logger.info(
             "Created %d chapters and %d scenes for story %s",

@@ -242,12 +242,9 @@ class PlannerAgent(BaseAgent):
 
         lines.append("")
         lines.append("Requirements:")
-        lines.append(f"  Target word count : {target_word_count}")
+        lines.append(f"  Target word count : {target_word_count} total across all scenes")
         lines.append(f"  Chapter count     : {chapter_count}")
         lines.append("  Scenes per chapter: 3-5")
-        lines.append(f"  Total words to distribute across ALL scenes: {target_word_count}")
-        lines.append(f"  Average per scene (assuming 4 scenes/chapter): ~{target_word_count // (chapter_count * 4)}")
-        lines.append(f"  Adjust per-scene targets so ALL scenes sum to {target_word_count} exactly.")
         lines.append("")
         lines.append(
             "Scene JSON keys (exact): "

@@ -174,7 +174,9 @@ class SceneWriterAgent(BaseAgent):
             f"  Conflict : {context.conflict}",
             f"  Outcome  : {context.outcome}",
             f"  Setting  : {context.setting_note}",
-            f"  Target   : {context.word_count_target} words",
+            f"  Target   : {context.word_count_target} words "
+            f"(write between {int(context.word_count_target * 0.85)} "
+            f"and {int(context.word_count_target * 1.15)} words)",
         ]
 
         if context.investigation_spine:
