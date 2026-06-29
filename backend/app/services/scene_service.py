@@ -7,12 +7,14 @@ Scenes are committed individually after each write so the pipeline is
 resumable if interrupted. A failed scene is marked status="failed" and
 the loop continues — scene failures never abort the full pipeline.
 
+Continuity agent runs after every scene (sequential intra-chapter) so
+mid-chapter state changes are reflected in the next scene's context.
+
 See SPEC_PHASE_6.md for full specification.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from uuid import UUID
 
@@ -25,7 +27,7 @@ from backend.app.agents.continuity_agent import ContinuityAgent
 from backend.app.agents.scene_writer_agent import SceneWriterAgent
 from backend.app.db.session import AsyncSessionLocal
 from backend.app.models.story import Story, StoryChapter, StoryScene
-from backend.app.schemas.story import SceneContext, SceneOutput, StoryPlan
+from backend.app.schemas.story import SceneContext, SceneOutput, StoryBible, StoryPlan
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +46,10 @@ class SceneService:
     ) -> list[SceneOutput]:
         """Write prose for every pending scene in the story.
 
-        Chapters are processed sequentially (each chapter's continuity digest
-        seeds the next chapter's scenes). Within each chapter, all scenes are
-        written concurrently via asyncio.gather() for reduced wall-clock time.
-
-        The continuity agent fires once per chapter boundary (not after the
-        final chapter), summarizing the whole chapter rather than each scene.
+        Chapters are processed sequentially. Within each chapter, scenes are
+        written sequentially (not concurrently) so the continuity agent can
+        update the digest after every scene, reflecting mid-chapter state
+        changes for the next scene's context.
 
         Parameters
         ----------
@@ -71,17 +71,27 @@ class SceneService:
         last_written_prose: str = ""  # tracks last scene prose for previous_scene_closing
         story_bible = story.story_bible or {}
 
-        # Parse story_bible for investigation_spine (graceful fallback)
+        # Parse story_bible for investigation_spine, artifacts, characters (graceful fallback)
         investigation_spine: str | None = None
+        artifacts = None
+        character_role_locks: dict[str, str] | None = None
+
         try:
-            from backend.app.schemas.story import StoryBible
             bible = StoryBible.model_validate(story_bible)
             investigation_spine = bible.investigation_spine
+            if bible.artifacts:
+                artifacts = bible.artifacts
+            if bible.characters and isinstance(bible.characters, dict):
+                character_role_locks = {k: str(v) for k, v in bible.characters.items()}
         except Exception as exc:
             logger.warning(
                 "StoryBible validation failed, falling back to dict access: %s", exc
             )
             investigation_spine = story_bible.get("investigation_spine")
+            artifacts = story_bible.get("artifacts")
+            chars = story_bible.get("characters", {})
+            if isinstance(chars, dict):
+                character_role_locks = {k: str(v) for k, v in chars.items()}
 
         protagonist_name = ""
         protagonist_description = ""
@@ -105,8 +115,6 @@ class SceneService:
                 elif role == "antagonist":
                     antagonist_name = char.get("name", "")
                     antagonist_description = char.get("description", "")
-
-        total_chapters = len(plan.chapters)
 
         async with SceneWriterAgent() as writer, ContinuityAgent() as continuity:
             for chapter_idx, chapter_plan in enumerate(plan.chapters):
@@ -143,22 +151,20 @@ class SceneService:
                         continue
                     scene_orms.append(scene_orm)
 
-                # Build SceneContext for each scene with previous_scene_closing.
-                # Only the first scene of the chapter receives previous_scene_closing
-                # (last 200 words from the prior chapter's final scene). Intra-chapter
-                # scenes with scene_number > 1 get None since they run concurrently
-                # and cannot read each other's output yet.
-                contexts: list[SceneContext] = []
+                # Sequential intra-chapter scene writing with per-scene continuity updates
+                chapter_outputs: list[SceneOutput] = []
+                scene_digest = running_digest  # per-scene running digest for this chapter
+
+                await writer.wake_server()
+
                 for idx, scene_plan in enumerate(chapter_plan.scenes):
-                    # Find matching scene_orm (same order as chapter_plan.scenes)
                     scene_orm = scene_orms[idx] if idx < len(scene_orms) else None
                     if scene_orm is None:
                         continue
 
-                    # Determine previous_scene_closing
+                    # Determine previous_scene_closing: last 200 words of last written prose
                     previous_closing: str | None = None
-                    if scene_plan.scene_number == 1 and last_written_prose:
-                        # First scene of a chapter (or story) — pass last 200 words
+                    if last_written_prose:
                         words = last_written_prose.split()
                         previous_closing = " ".join(words[-200:]) if words else None
 
@@ -179,71 +185,52 @@ class SceneService:
                         antagonist_description=antagonist_description,
                         tone=tone,
                         pacing_notes=pacing_notes,
-                        continuity_digest=running_digest if running_digest else None,
+                        continuity_digest=scene_digest if scene_digest else None,
                         previous_scene_closing=previous_closing,
                         scene_objective=scene_plan.scene_objective,
                         investigation_spine=investigation_spine,
+                        artifacts=artifacts,
+                        character_role_locks=character_role_locks,
+                        state_changes=scene_plan.state_changes,
                     )
-                    contexts.append(context)
 
-                # Wake server before dispatching concurrent scene writes
-                await writer.wake_server()
-
-                tasks = [
-                    self._write_single_scene(writer, ctx, story.id, scene_orms[i].id)
-                    for i, ctx in enumerate(contexts)
-                ]
-                chapter_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                # Process results
-                chapter_outputs: list[SceneOutput] = []
-                for result in chapter_results:
-                    if isinstance(result, Exception):
-                        # asyncio.gather captured an exception
-                        logger.error("Scene write task failed: %s", result)
-                        # Find which scene failed (cannot determine from gather order,
-                        # but we need to track failed outputs)
+                    try:
+                        result = await self._write_single_scene(
+                            writer, context, story.id, scene_orm.id
+                        )
+                        outputs.append(result)
+                        chapter_outputs.append(result)
+                        if result.prose:
+                            last_written_prose = result.prose
+                            # Update digest after every scene so next scene sees current state
+                            try:
+                                await continuity.wake_server()
+                                scene_digest = await continuity.update_digest(
+                                    db=db,
+                                    story_id=story.id,
+                                    scene_id=scene_orm.id,
+                                    scene_prose=result.prose,
+                                    prior_digest=scene_digest,
+                                )
+                            except Exception as exc:
+                                logger.warning(
+                                    "Per-scene continuity update failed for scene %d ch %d: %s",
+                                    scene_plan.scene_number,
+                                    effective_chapter_number,
+                                    exc,
+                                )
+                    except Exception as exc:
+                        logger.error("Scene write task failed: %s", exc)
                         outputs.append(
                             SceneOutput(
-                                scene_id=UUID("00000000-0000-0000-0000-000000000000"),
+                                scene_id=scene_orm.id,
                                 prose="",
                                 actual_word_count=0,
                                 target_word_count=0,
                             )
                         )
-                    else:
-                        outputs.append(result)
-                        chapter_outputs.append(result)
-                        if result.prose:
-                            last_written_prose = result.prose
 
-                # Run continuity agent at chapter boundary (NOT after final chapter)
-                is_last_chapter = (chapter_idx + 1) == total_chapters
-                if not is_last_chapter and chapter_outputs:
-                    chapter_prose = "\n\n".join(
-                        out.prose for out in chapter_outputs if out.prose
-                    )
-                    if chapter_prose:
-                        try:
-                            # Wake server before continuity agent (post-idle gap)
-                            await continuity.wake_server()
-                            running_digest = await continuity.update_digest(
-                                db=db,
-                                story_id=story.id,
-                                scene_id=None,
-                                scene_prose=chapter_prose,
-                                prior_digest=running_digest,
-                            )
-                            # Store continuity notes on the chapter record
-                            chapter_orm.continuity_notes = running_digest
-                            await db.commit()
-                        except Exception as exc:
-                            logger.error(
-                                "Continuity digest update failed for chapter %d of story %s: %s",
-                                effective_chapter_number,
-                                story.id,
-                                exc,
-                            )
+                running_digest = scene_digest  # promote to inter-chapter digest at chapter end
 
                 # Mark chapter complete if at least one scene completed
                 has_complete = any(
@@ -294,7 +281,7 @@ class SceneService:
         Raises
         ------
         AgentError
-            If the writer fails (caught by asyncio.gather in caller).
+            If the writer fails (caught by caller).
         """
         async with AsyncSessionLocal() as session:
             scene_orm = await session.get(StoryScene, scene_id)

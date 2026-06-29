@@ -86,8 +86,8 @@ class ScenePlan(BaseModel):
         None,
         description="One sentence: what Nyx/protagonist must achieve or learn in this scene",
     )
-    state_changes: str | None = Field(
-        None,
+    state_changes: list[str] | None = Field(
+        default=None,
         description=(
             "Concrete facts that are true after this scene ends — "
             "artifact location, character status, destroyed objects, made promises. "
@@ -264,7 +264,8 @@ class SceneContext(BaseModel):
     scene_objective: str | None = None   # in-scene task from ScenePlan
     investigation_spine: str | None = None  # from story_bible
     artifacts: list[ArtifactEntry] | None = None  # canonical artifact locks from story_bible
-    characters: dict[str, str] | None = None  # character role locks from story_bible
+    character_role_locks: dict[str, str] | None = None  # character role locks from story_bible
+    state_changes: list[str] | None = None  # locked facts from planner about what this scene must establish
 
 
 class SceneOutput(BaseModel):
