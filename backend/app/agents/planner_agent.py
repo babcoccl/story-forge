@@ -143,16 +143,21 @@ class PlannerAgent(BaseAgent):
             "3. ARTIFACT CONTINUITY: If any artifact or object drives the plot, define it once "
             "in story_bible.artifacts with a canonical name and physical description. "
             "Never rename or re-describe it. If it changes state (broken, stolen, activated), "
-            "update current_state in the continuity digest only — the canonical description stays fixed.\n\n"
+            "update current_state in the continuity digest only — the canonical description stays fixed. "
+            "In every scene plan where the artifact is present or referenced, "
+            "state_changes must include a line beginning with 'ARTIFACT:' that states "
+            "its exact canonical name and current location/holder.\n\n"
             "4. CHARACTER ROLE LOCK: Each character has exactly one role that does not change. "
             "A detective is always a detective. A supernatural outsider may work alongside "
             "police but is never re-introduced as something else. "
             "story_bible.characters must list every named character with their locked role.\n\n"
-            "5. CAUSAL SCENE CHAIN: Each scene's outcome must be the direct cause of the next "
-            "scene's goal. Before writing scene N+1, check: 'does scene N's outcome force "
-            "this new goal?' If not, restructure. "
-            "Scenes must end on a concrete consequence that changes the situation — "
-            "not on mood, resolve, or atmospheric description.\n\n"
+            "5. CAUSAL SCENE CHAIN: Each scene must include a 'state_changes' field — a list of "
+            "concrete facts that are locked true after this scene: artifact location, character "
+            "status changes, destroyed objects, made promises, open wounds. "
+            "The next scene's 'goal' must directly reference at least one entry from the prior "
+            "scene's state_changes. "
+            "state_changes must use declarative sentences: 'Jasper is now in custody at the warehouse.' "
+            "'The artifact is in Nyx's possession.' Never use vague language like 'tension escalates'.\n\n"
             "6. MYSTERY LAYERING (not replacement): Each act has one dominant question. "
             "Act 1 (Ch 1): Who committed the crime and why? "
             "Act 2 (Ch 2): What larger network enabled it? "
@@ -165,10 +170,10 @@ class PlannerAgent(BaseAgent):
             "- Exactly {chapter_count} chapters\n"
             "- 3-5 scenes per chapter\n"
             "- Each chapter: chapter_number (int, 1-based), title, summary (2 sentences max), scenes\n"
-            "- Each scene: scene_number, scene_objective, goal, conflict, outcome, "
+            "- Each scene: scene_number, scene_objective, goal, conflict, outcome, state_changes, "
             "setting_note, word_count_target\n"
             "- Each scene must use EXACTLY these JSON keys: "
-            "scene_number, scene_objective, goal, conflict, outcome, setting_note, word_count_target\n"
+            "scene_number, scene_objective, goal, conflict, outcome, state_changes, setting_note, word_count_target\n"
             "  Do NOT use setting_note_reference, word_count_allocation, or any other variant.\n"
             "- story_bible keys: investigation_spine, tone, pacing_notes, characters, "
             "factions, artifacts\n"
@@ -248,11 +253,14 @@ class PlannerAgent(BaseAgent):
         lines.append("")
         lines.append(
             "Scene JSON keys (exact): "
-            "scene_number, scene_objective, goal, conflict, outcome, setting_note, word_count_target"
+            "scene_number, scene_objective, goal, conflict, outcome, state_changes, setting_note, word_count_target"
         )
         lines.append("")
         lines.append("Before writing any scenes, write investigation_spine first.")
         lines.append("Every scene outcome must name a concrete consequence.")
+        lines.append(
+            "Every scene must include state_changes: a list of 3-5 declarative facts locked true after the scene."
+        )
         lines.append("")
         lines.append("/no_think")
         return "\n".join(lines)

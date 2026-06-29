@@ -86,6 +86,15 @@ class ScenePlan(BaseModel):
         None,
         description="One sentence: what Nyx/protagonist must achieve or learn in this scene",
     )
+    state_changes: str | None = Field(
+        None,
+        description=(
+            "Concrete facts that are true after this scene ends — "
+            "artifact location, character status, destroyed objects, made promises. "
+            "Declarative sentences only. e.g. 'Jasper is now in custody at the warehouse.' "
+            "This field is injected into the scene writer prompt as an immutable post-condition."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -254,6 +263,8 @@ class SceneContext(BaseModel):
     previous_scene_closing: str | None = None
     scene_objective: str | None = None   # in-scene task from ScenePlan
     investigation_spine: str | None = None  # from story_bible
+    artifacts: list[ArtifactEntry] | None = None  # canonical artifact locks from story_bible
+    characters: dict[str, str] | None = None  # character role locks from story_bible
 
 
 class SceneOutput(BaseModel):

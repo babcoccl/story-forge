@@ -17,11 +17,24 @@ class ContinuityAgent(BaseAgent):
     SYSTEM_PROMPT = (
         "You are a narrative continuity tracker for a long-form fiction "
         "generation system. You maintain a compact, factual digest of "
-        "story state — not a prose summary. "
-        "Your output must have exactly four labelled sections: "
-        "CHARACTERS, WORLD STATE, OPEN THREADS, and LAST BEAT. "
-        "Be precise and factual. Maximum 350 words total. "
-        "Do not write prose. Do not editorialize. Facts only."
+        "story state. "
+        "Output exactly five labeled sections in this order: "
+        "ARTIFACT LOCK, CHARACTER ROLES, CHARACTER STATUS, WORLD STATE, "
+        "OPEN THREADS. "
+        "ARTIFACT LOCK: canonical name and physical description, frozen — "
+        "never paraphrase. If the artifact's physical state changed (broken, "
+        "stolen, activated), add a 'current state' line only. "
+        "CHARACTER ROLES: one line per named character — name: locked role "
+        "(never changes). "
+        "CHARACTER STATUS: one line per named character — name: current "
+        "location/condition after this scene. "
+        "WORLD STATE: 2-3 bullet facts about the environment, active "
+        "factions, and objects. "
+        "OPEN THREADS: numbered list of unresolved consequences and "
+        "promises the story must pay off. "
+        "Be precise and factual. Maximum 400 words total. "
+        "Do not write prose. Do not editorialize. Facts only. "
+        "Never rename the artifact. Never change a character's role."
     )
 
     async def update_digest(
@@ -54,7 +67,7 @@ class ContinuityAgent(BaseAgent):
         Returns
         -------
         str
-            The updated continuity digest (max 350 words).
+            The updated continuity digest (max 400 words).
             If the LLM call fails, returns prior_digest unchanged.
         """
         prior_text = (
@@ -71,9 +84,13 @@ class ContinuityAgent(BaseAgent):
             f"New scene just written:\n{prose_excerpt}\n\n"
             "Update the continuity digest to reflect everything that has "
             "now occurred.\n"
-            "Output the four sections: CHARACTERS, WORLD STATE, "
-            "OPEN THREADS, LAST BEAT.\n"
-            "Maximum 350 words."
+            "Output the five sections: ARTIFACT LOCK, CHARACTER ROLES, "
+            "CHARACTER STATUS, WORLD STATE, OPEN THREADS.\n"
+            "CRITICAL: Copy ARTIFACT LOCK and CHARACTER ROLES verbatim "
+            "from the prior digest if the scene does not change them. "
+            "Only update CHARACTER STATUS, WORLD STATE, and OPEN THREADS "
+            "based on the new scene.\n"
+            "Maximum 400 words."
         )
 
         try:
@@ -81,7 +98,7 @@ class ContinuityAgent(BaseAgent):
                 db=db,
                 story_id=story_id,
                 user_message=user_message,
-                max_tokens=600,
+                max_tokens=750,
             )
             return result.strip()
         except AgentError as exc:
