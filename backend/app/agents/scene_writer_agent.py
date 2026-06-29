@@ -35,7 +35,7 @@ class SceneWriterAgent(BaseAgent):
         "Each scene must hit its target word count within plus or minus ten percent. "
         "Do not summarize — write prose. Show, don't tell. "
         "Maintain character voice and tone from the story bible provided. "
-        "End every scene with a clear narrative beat transition that sets up the next scene. "
+        "End every scene at its natural narrative conclusion. Write only this scene's content — do not begin or preview the next scene. "
         "Output prose only — no headers, no scene labels, no commentary. "
         "When a Continuity State section is provided, treat it as ground truth "
         "for current character locations, emotional states, and open narrative "
@@ -74,7 +74,9 @@ class SceneWriterAgent(BaseAgent):
             If all 3 attempts fail.
         """
         base_user_message = self._build_user_message(context)
-        max_tokens = min(self._settings.llm_max_tokens, 32192)
+        # Dynamic token limit: words × 1.15 headroom ÷ 0.75 words-per-token
+        # e.g. 1,250-word target → ~1,917 tokens (vs. global 4,096 cap)
+        max_tokens = int(context.word_count_target * 1.15 / 0.75)
 
         max_attempts = 3
         last_error: Exception | None = None

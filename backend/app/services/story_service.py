@@ -54,6 +54,11 @@ class StoryService:
         self._scene_service = SceneService()
         self._chapter_service = ChapterService()
         self._revision_service = RevisionService()
+        logger.info(
+            "Revision loop threshold=%.2f max_revisions=%d",
+            get_settings().prose_quality_threshold,
+            get_settings().max_scene_revisions,
+        )
 
     # ------------------------------------------------------------------
     # Public API — fast path (returns immediately)
@@ -488,6 +493,7 @@ class StoryService:
     ) -> None:
         """Create StoryChapter and StoryScene records from the plan."""
         total_scenes = 0
+        settings = get_settings()
 
         for chapter_plan in plan.chapters:
             chapter = StoryChapter(
@@ -508,6 +514,11 @@ class StoryService:
                     beat=beat,
                     status="pending",
                     word_count=scene_plan.word_count_target,
+                )
+                # Normalize: cap at target_words_per_scene, floor at 800
+                scene.word_count = min(
+                    max(scene.word_count, 800),
+                    settings.target_words_per_scene,
                 )
                 db.add(scene)
                 total_scenes += 1
