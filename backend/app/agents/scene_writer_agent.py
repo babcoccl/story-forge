@@ -35,7 +35,9 @@ class SceneWriterAgent(BaseAgent):
         "Each scene must hit its target word count within plus or minus ten percent. "
         "Do not summarize — write prose. Show, don't tell. "
         "Maintain character voice and tone from the story bible provided. "
-        "End every scene at its natural narrative conclusion. Write only this scene's content — do not begin or preview the next scene. "
+        "End every scene on a concrete in-world action, image, or spoken line — never a summary sentence describing what will happen next. "
+        "Do not write transition sentences, setup paragraphs, or any line that names what the protagonist 'is about to do' or 'must now face'. "
+        "Write only this scene's content. "
         "Output prose only — no headers, no scene labels, no commentary. "
         "When a Continuity State section is provided, treat it as ground truth "
         "for current character locations, emotional states, and open narrative "
@@ -193,7 +195,9 @@ class SceneWriterAgent(BaseAgent):
 
         lines.append("")
         lines.append(
-            "Write the scene now. End on a concrete consequence that forces the next scene. "
+            "Write the scene now. End on the last action or image of the scene — "
+            "a moment, a line of dialogue, or a physical detail. "
+            "Do not write a closing summary or transition sentence. "
             "Output prose only — no headers, no commentary."
         )
         return "\n".join(lines)

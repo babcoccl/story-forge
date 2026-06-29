@@ -202,9 +202,6 @@ class PlannerAgent(BaseAgent):
         theme = role_map.get("theme")
         secondary_setting = role_map.get("secondary_setting")
 
-        scenes_total = chapter_count * 4
-        words_per_scene = target_word_count // scenes_total if scenes_total else 0
-
         lines = ["Story Components:"]
 
         if protagonist:
@@ -248,7 +245,9 @@ class PlannerAgent(BaseAgent):
         lines.append(f"  Target word count : {target_word_count}")
         lines.append(f"  Chapter count     : {chapter_count}")
         lines.append("  Scenes per chapter: 3-5")
-        lines.append(f"  Words per scene   : ~{words_per_scene} (approximate)")
+        lines.append(f"  Total words to distribute across ALL scenes: {target_word_count}")
+        lines.append(f"  Average per scene (assuming 4 scenes/chapter): ~{target_word_count // (chapter_count * 4)}")
+        lines.append(f"  Adjust per-scene targets so ALL scenes sum to {target_word_count} exactly.")
         lines.append("")
         lines.append(
             "Scene JSON keys (exact): "
