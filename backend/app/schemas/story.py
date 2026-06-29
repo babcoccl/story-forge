@@ -11,7 +11,7 @@ Schemas:
 """
 
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -140,7 +140,7 @@ class ScenePlan(BaseModel):
 class ChapterPlan(BaseModel):
     """One chapter in the story plan."""
 
-    chapter_number: Optional[int] = Field(None, description="1-based chapter number")
+    chapter_number: int = Field(..., description="1-based chapter number, starting from 1")
     title: str | None = Field(None, description="Chapter title")
     summary: str = Field(..., description="2-3 sentence chapter summary")
     scenes: list[ScenePlan] = Field(

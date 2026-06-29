@@ -291,6 +291,24 @@ class BaseAgent:
                 raise AgentError(f"LLM JSON missing required keys: {missing}")
         return result
 
+    async def wake_server(self) -> None:
+        """Send a minimal ping to wake the server if it is sleeping.
+
+        llama-server accepts a GET /health endpoint that wakes it from
+        sleep without consuming a slot or generating tokens. Safe to call
+        before any batch of LLM requests after a known idle gap.
+        """
+        try:
+            resp = await self._client.get("/health", timeout=httpx.Timeout(10.0))
+            if resp.status_code == 200:
+                data = resp.json()
+                status = data.get("status", "unknown")
+                if status != "ok":
+                    logger.info("llama-server woke from sleep (status=%s)", status)
+            logger.debug("llama-server health check: %s", resp.status_code)
+        except Exception as exc:
+            logger.warning("wake_server ping failed (non-fatal): %s", exc)
+
     async def close(self) -> None:
         await self._client.aclose()
 

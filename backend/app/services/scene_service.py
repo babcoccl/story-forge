@@ -77,7 +77,10 @@ class SceneService:
             from backend.app.schemas.story import StoryBible
             bible = StoryBible.model_validate(story_bible)
             investigation_spine = bible.investigation_spine
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "StoryBible validation failed, falling back to dict access: %s", exc
+            )
             investigation_spine = story_bible.get("investigation_spine")
 
         protagonist_name = ""
@@ -107,13 +110,16 @@ class SceneService:
 
         async with SceneWriterAgent() as writer, ContinuityAgent() as continuity:
             for chapter_idx, chapter_plan in enumerate(plan.chapters):
+                # Defensive fallback: if chapter_number was not provided by LLM, derive it
+                effective_chapter_number = chapter_plan.chapter_number or (chapter_idx + 1)
+
                 chapter_orm = await self._load_chapter(
-                    db, story.id, chapter_plan.chapter_number
+                    db, story.id, effective_chapter_number
                 )
                 if chapter_orm is None:
                     logger.error(
                         "Chapter %d not found in DB for story %s — skipping",
-                        chapter_plan.chapter_number,
+                        effective_chapter_number,
                         story.id,
                     )
                     continue
@@ -158,7 +164,7 @@ class SceneService:
 
                     context = SceneContext(
                         scene_id=scene_orm.id,
-                        chapter_number=chapter_plan.chapter_number,
+                        chapter_number=effective_chapter_number,
                         chapter_title=chapter_plan.title,
                         scene_number=scene_plan.scene_number,
                         beat=scene_orm.beat or "",
@@ -180,7 +186,9 @@ class SceneService:
                     )
                     contexts.append(context)
 
-                # Write all scenes in this chapter concurrently
+                # Wake server before dispatching concurrent scene writes
+                await writer.wake_server()
+
                 tasks = [
                     self._write_single_scene(writer, ctx, story.id, scene_orms[i].id)
                     for i, ctx in enumerate(contexts)
@@ -217,6 +225,8 @@ class SceneService:
                     )
                     if chapter_prose:
                         try:
+                            # Wake server before continuity agent (post-idle gap)
+                            await continuity.wake_server()
                             running_digest = await continuity.update_digest(
                                 db=db,
                                 story_id=story.id,
@@ -227,15 +237,11 @@ class SceneService:
                             # Store continuity notes on the chapter record
                             chapter_orm.continuity_notes = running_digest
                             await db.commit()
-                            logger.info(
-                                "Chapter %d continuity digest updated (%d chars)",
-                                chapter_plan.chapter_number,
-                                len(running_digest),
-                            )
                         except Exception as exc:
-                            logger.warning(
-                                "ContinuityAgent failed for chapter %d boundary: %s",
-                                chapter_plan.chapter_number,
+                            logger.error(
+                                "Continuity digest update failed for chapter %d of story %s: %s",
+                                effective_chapter_number,
+                                story.id,
                                 exc,
                             )
 
