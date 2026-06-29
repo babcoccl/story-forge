@@ -89,27 +89,29 @@ class PlannerAgent(BaseAgent):
                     user_message,
                     schema=StoryPlan.model_json_schema(),
                     max_tokens=16000,
+                    enforce_schema=True,
                 )
-                try:
-                    plan = StoryPlan(**result)
-                except ValidationError as ve:
-                    raise AgentError(
-                        f"StoryPlan validation failed on attempt {attempt} "
-                        f"({ve.error_count()} errors): {ve}"
-                    ) from ve
-                logger.info(
-                    "PlannerAgent.plan succeeded on attempt %d  "
-                    "(chapters=%d, scenes=%d)",
-                    attempt,
-                    len(plan.chapters),
-                    sum(len(ch.scenes) for ch in plan.chapters),
-                )
-                return plan
+                plan = StoryPlan(**result)
+            except ValidationError as ve:
+                raise AgentError(
+                    f"StoryPlan validation failed on attempt {attempt} "
+                    f"({ve.error_count()} errors): {ve}"
+                ) from ve
             except AgentError as exc:
                 last_error = exc
                 logger.warning(
                     "PlannerAgent.plan attempt %d failed: %s", attempt, exc
                 )
+                continue
+
+            logger.info(
+                "PlannerAgent.plan succeeded on attempt %d  "
+                "(chapters=%d, scenes=%d)",
+                attempt,
+                len(plan.chapters),
+                sum(len(ch.scenes) for ch in plan.chapters),
+            )
+            return plan
 
         raise AgentError(
             f"PlannerAgent failed after {max_attempts} attempts: {last_error}"

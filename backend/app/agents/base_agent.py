@@ -188,17 +188,53 @@ class BaseAgent:
         user_message: str = "",
         schema: dict | None = None,
         max_tokens: int | None = None,
+        enforce_schema: bool = False,
     ) -> dict:
-        """Call LLM with JSON response format, parse and return dict."""
-        rf = {"type": "json_object"}
-        raw = await self.call(
-            db=db,
-            story_id=story_id,
-            scene_id=scene_id,
-            user_message=user_message,
-            response_format=rf,
-            max_tokens=max_tokens,
-        )
+        """Call LLM with JSON response format, parse and return dict.
+
+        When enforce_schema=True and schema is provided, uses json_schema
+        response format for grammar-constrained decoding. If llama-server
+        rejects the schema (HTTP 400/500), falls back to json_object.
+        """
+        if enforce_schema and schema:
+            rf = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "story_plan",
+                    "strict": False,
+                    "schema": schema,
+                },
+            }
+        else:
+            rf = {"type": "json_object"}
+
+        # Try with json_schema first; fall back to json_object if rejected
+        try:
+            raw = await self.call(
+                db=db,
+                story_id=story_id,
+                scene_id=scene_id,
+                user_message=user_message,
+                response_format=rf,
+                max_tokens=max_tokens,
+            )
+        except AgentError as first_error:
+            # Fall back to json_object if json_schema was rejected by llama-server
+            if enforce_schema and schema and "response_format" in str(first_error).lower():
+                logger.warning(
+                    "json_schema response format rejected — falling back to json_object"
+                )
+                rf = {"type": "json_object"}
+                raw = await self.call(
+                    db=db,
+                    story_id=story_id,
+                    scene_id=scene_id,
+                    user_message=user_message,
+                    response_format=rf,
+                    max_tokens=max_tokens,
+                )
+            else:
+                raise
 
         # Strip Qwen3 thinking blocks if present
         raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
