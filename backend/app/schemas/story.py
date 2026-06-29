@@ -20,6 +20,42 @@ from pydantic import BaseModel, Field, model_validator
 # Planner Output Schemas
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Story Bible Sub-schemas (structured story_bible contract)
+# ---------------------------------------------------------------------------
+
+class FactionEntry(BaseModel):
+    """A named faction with its singular narrative function."""
+
+    name: str
+    function: str  # e.g. "moves weapons through the city"
+    known_to_protagonist_by: str | None = None  # e.g. "Chapter 2 Scene 1"
+
+
+class ArtifactEntry(BaseModel):
+    """Canonical artifact identity to prevent description drift."""
+
+    canonical_name: str  # e.g. "the Obsidian Seal"
+    description: str  # single physical description, never changes
+    current_state: str  # e.g. "whole", "shattered", "missing"
+    last_known_location: str
+
+
+class StoryBible(BaseModel):
+    """Structured story bible produced by PlannerAgent."""
+
+    investigation_spine: str = Field(
+        ...,
+        description="One sentence: how the opening mystery connects to the final confrontation",
+    )
+    tone: str
+    pacing_notes: str
+    characters: dict[str, Any] = Field(default_factory=dict)
+    factions: list[FactionEntry] = Field(default_factory=list)
+    artifacts: list[ArtifactEntry] = Field(default_factory=list)
+    character_states: dict[str, Any] | None = None
+
+
 class ScenePlan(BaseModel):
     """One scene within a chapter.
 
@@ -45,6 +81,10 @@ class ScenePlan(BaseModel):
     word_count_target: int | None = Field(
         None,
         description="Suggested word count for this scene",
+    )
+    scene_objective: str | None = Field(
+        None,
+        description="One sentence: what Nyx/protagonist must achieve or learn in this scene",
     )
 
     @model_validator(mode="before")
@@ -212,6 +252,8 @@ class SceneContext(BaseModel):
     pacing_notes: str
     continuity_digest: str | None = None
     previous_scene_closing: str | None = None
+    scene_objective: str | None = None   # in-scene task from ScenePlan
+    investigation_spine: str | None = None  # from story_bible
 
 
 class SceneOutput(BaseModel):

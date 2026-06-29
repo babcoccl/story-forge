@@ -71,6 +71,15 @@ class SceneService:
         last_written_prose: str = ""  # tracks last scene prose for previous_scene_closing
         story_bible = story.story_bible or {}
 
+        # Parse story_bible for investigation_spine (graceful fallback)
+        investigation_spine: str | None = None
+        try:
+            from backend.app.schemas.story import StoryBible
+            bible = StoryBible.model_validate(story_bible)
+            investigation_spine = bible.investigation_spine
+        except Exception:
+            investigation_spine = story_bible.get("investigation_spine")
+
         protagonist_name = ""
         protagonist_description = ""
         antagonist_name = ""
@@ -157,7 +166,7 @@ class SceneService:
                         conflict=scene_plan.conflict,
                         outcome=scene_plan.outcome,
                         setting_note=scene_plan.setting_note or "Primary setting",
-                        word_count_target=scene_plan.word_count_target or 1250,
+                        word_count_target=scene_orm.word_count or scene_plan.word_count_target or 1250,
                         protagonist_name=protagonist_name,
                         protagonist_description=protagonist_description,
                         antagonist_name=antagonist_name,
@@ -166,6 +175,8 @@ class SceneService:
                         pacing_notes=pacing_notes,
                         continuity_digest=running_digest if running_digest else None,
                         previous_scene_closing=previous_closing,
+                        scene_objective=scene_plan.scene_objective,
+                        investigation_spine=investigation_spine,
                     )
                     contexts.append(context)
 

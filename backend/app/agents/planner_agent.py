@@ -121,31 +121,58 @@ class PlannerAgent(BaseAgent):
 
     @staticmethod
     def _build_system_prompt(chapter_count: int) -> str:
-        """Build the system prompt for the planner."""
+        """Build the system prompt for the planner with structural quality rules."""
         return (
-            "You are a professional story planner for a creative writing system. "
-            "You receive a set of approved story components and must generate a "
-            "complete, structured story plan as JSON.\n\n"
-            "The plan must:\n"
-            "- Have a compelling title and single-sentence logline\n"
-            "- Contain exactly {chapter_count} chapters\n"
-            "- Each chapter must have 3-5 scenes\n"
+            "You are a professional story architect for a long-form fiction system. "
+            "You receive approved story components and produce a complete structured plan as JSON.\n\n"
+            "STRUCTURAL RULES — violating any of these produces a weak story:\n\n"
+            "1. INVESTIGATION SPINE: Write one sentence in story_bible.investigation_spine "
+            "that names how the opening mystery connects to the final confrontation. "
+            "Example: 'The Butcher murders connect the arms trade to the Serpent's Hand "
+            "through a stolen artifact the cult needs to complete a ritual.' "
+            "Every scene must advance, complicate, or resolve this spine. "
+            "Do not introduce factions, artifacts, or characters that are not already "
+            "connected to this spine.\n\n"
+            "2. FACTION DISCIPLINE: List every faction in story_bible.factions. "
+            "Each faction must have a single distinct function "
+            "(e.g. 'moves weapons', 'seeks the artifact', 'holds the historical key'). "
+            "Do not add a new faction after Chapter 1 unless a prior faction's arc is resolved. "
+            "Factions must collide — their conflicting functions are where scenes happen.\n\n"
+            "3. ARTIFACT CONTINUITY: If any artifact or object drives the plot, define it once "
+            "in story_bible.artifacts with a canonical name and physical description. "
+            "Never rename or re-describe it. If it changes state (broken, stolen, activated), "
+            "update current_state in the continuity digest only — the canonical description stays fixed.\n\n"
+            "4. CHARACTER ROLE LOCK: Each character has exactly one role that does not change. "
+            "A detective is always a detective. A supernatural outsider may work alongside "
+            "police but is never re-introduced as something else. "
+            "story_bible.characters must list every named character with their locked role.\n\n"
+            "5. CAUSAL SCENE CHAIN: Each scene's outcome must be the direct cause of the next "
+            "scene's goal. Before writing scene N+1, check: 'does scene N's outcome force "
+            "this new goal?' If not, restructure. "
+            "Scenes must end on a concrete consequence that changes the situation — "
+            "not on mood, resolve, or atmospheric description.\n\n"
+            "6. MYSTERY LAYERING (not replacement): Each act has one dominant question. "
+            "Act 1 (Ch 1): Who committed the crime and why? "
+            "Act 2 (Ch 2): What larger network enabled it? "
+            "Act 3 (Ch 3): What is at stake if the protagonist fails? "
+            "Reveals must sharpen the dominant question, not replace it with a different one.\n\n"
+            "7. SCENE OBJECTIVE: Every scene must include scene_objective — one sentence "
+            "stating what the protagonist must achieve or learn before the scene can end. "
+            "This is separate from goal (narrative purpose) — it is the in-scene task.\n\n"
+            "JSON REQUIREMENTS:\n"
+            "- Exactly {chapter_count} chapters\n"
+            "- 3-5 scenes per chapter\n"
+            "- Each chapter: chapter_number (int, 1-based), title, summary (2 sentences max), scenes\n"
+            "- Each scene: scene_number, scene_objective, goal, conflict, outcome, "
+            "setting_note, word_count_target\n"
             "- Each scene must use EXACTLY these JSON keys: "
-            "scene_number, goal, conflict, outcome, setting_note, word_count_target\n"
+            "scene_number, scene_objective, goal, conflict, outcome, setting_note, word_count_target\n"
             "  Do NOT use setting_note_reference, word_count_allocation, or any other variant.\n"
-            "- IMPORTANT: Every chapter object MUST include chapter_number as an integer\n"
-            "  starting from 1. Do not omit this field. Example chapter structure:\n"
-            "  {{ \"chapter_number\": 1, \"title\": \"...\", \"summary\": \"...\", \"scenes\": [...] }}\n"
-            "- The story_bible must capture character states, world details, and tone\n"
-            "- Distribute word count evenly across scenes to reach target_word_count total\n"
-            "- Use the protagonist and antagonist to drive the central conflict\n"
-            "- Ground every scene in the provided setting components\n"
-            "- Keep scene goals, conflicts, and outcomes to 1 sentence each\n"
-            "- Keep chapter summaries to 2 sentences maximum\n"
-            "- story_bible should have 3 keys only: tone, pacing_notes, character_states\n"
-            "Respond with a JSON object matching the StoryPlan schema exactly.\n"
-            "Respond with a JSON object. Include title, logline, chapters, and story_bible.\n"
-            "synopsis, themes, and chapter_count are optional — omit if you are uncertain.\n\n"
+            "- story_bible keys: investigation_spine, tone, pacing_notes, characters, "
+            "factions, artifacts\n"
+            "- Distribute word count evenly across scenes\n\n"
+            "Respond with a JSON object matching the StoryPlan schema. "
+            "synopsis, themes, and chapter_count are optional.\n"
         ).format(chapter_count=chapter_count)
 
     @staticmethod
@@ -223,8 +250,11 @@ class PlannerAgent(BaseAgent):
         lines.append("")
         lines.append(
             "Scene JSON keys (exact): "
-            "scene_number, goal, conflict, outcome, setting_note, word_count_target"
+            "scene_number, scene_objective, goal, conflict, outcome, setting_note, word_count_target"
         )
+        lines.append("")
+        lines.append("Before writing any scenes, write investigation_spine first.")
+        lines.append("Every scene outcome must name a concrete consequence.")
         lines.append("")
         lines.append("/no_think")
         return "\n".join(lines)

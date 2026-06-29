@@ -74,9 +74,9 @@ class SceneWriterAgent(BaseAgent):
             If all 3 attempts fail.
         """
         base_user_message = self._build_user_message(context)
-        # Dynamic token limit: words × 1.15 headroom ÷ 0.75 words-per-token
-        # e.g. 1,250-word target → ~1,917 tokens (vs. global 4,096 cap)
-        max_tokens = int(context.word_count_target * 1.15 / 0.75)
+        # Dynamic cap: words × 1.15 headroom ÷ 0.75 words-per-token, floored at 2048
+        # so a low planner target never starves generation below a safe minimum.
+        max_tokens = max(int(context.word_count_target * 1.15 / 0.75), 2048)
 
         max_attempts = 3
         last_error: Exception | None = None
@@ -175,6 +175,12 @@ class SceneWriterAgent(BaseAgent):
             f"  Target   : {context.word_count_target} words",
         ]
 
+        if context.investigation_spine:
+            lines.append(f"  Story spine  : {context.investigation_spine}")
+
+        if context.scene_objective:
+            lines.append(f"  Objective    : {context.scene_objective}")
+
         if context.continuity_digest:
             lines.append("")
             lines.append("Continuity State (what has actually happened so far):")
@@ -186,5 +192,8 @@ class SceneWriterAgent(BaseAgent):
             lines.append(context.previous_scene_closing)
 
         lines.append("")
-        lines.append("Write the scene now. Output prose only — no headers, no commentary.")
+        lines.append(
+            "Write the scene now. End on a concrete consequence that forces the next scene. "
+            "Output prose only — no headers, no commentary."
+        )
         return "\n".join(lines)
