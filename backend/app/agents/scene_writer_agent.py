@@ -15,9 +15,21 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.agents.base_agent import AgentError, BaseAgent
-from backend.app.schemas.story import SceneContext, SceneOutput
+from backend.app.schemas.story import SceneContext, SceneOutput, SettingBrief
 
 logger = logging.getLogger(__name__)
+
+
+def _render_setting_brief(brief: "SettingBrief") -> str:
+    """Render a SettingBrief as indented lines for the scene writer prompt."""
+    lines = [
+        f"  Location     : {brief.location_name}",
+        f"  Time of day  : {brief.time_of_day}",
+        f"  Sensory details: {brief.sensory_details}",
+    ]
+    if brief.spatial_note:
+        lines.append(f"  Spatial note : {brief.spatial_note}")
+    return "\n" + "\n".join(lines)
 
 
 class SceneWriterAgent(BaseAgent):
@@ -62,7 +74,13 @@ class SceneWriterAgent(BaseAgent):
         "a contact cannot become a captive, a dealer cannot become an ally. "
         "When SCENE GROUND TRUTH facts are provided, your scene must establish each "
         "listed fact as a concrete in-world event before the scene ends. "
-        "Do not leave these as implied or pending."
+        "Do not leave these as implied or pending. "
+        "When Locked Story State is provided, every field is an immutable fact at scene open — "
+        "do not contradict, undo, or ignore any of them. "
+        "When a Setting section with Sensory details is provided, open the scene inside that location — "
+        "the first paragraph must establish the physical space before advancing the plot. "
+        "The following phrases are banned unless the scene plan explicitly requires a time skip: "
+        '"Later," "Some time after," "Eventually," "Hours passed," and equivalent time-elision openers.'
     )
 
     @property
@@ -195,7 +213,14 @@ class SceneWriterAgent(BaseAgent):
             f"  Goal     : {context.goal}",
             f"  Conflict : {context.conflict}",
             f"  Outcome  : {context.outcome}",
-            f"  Setting  : {context.setting_note}",
+            "",
+            # Setting: prefer structured setting_brief; fall back to setting_note label
+            "Setting:"
+            + (
+                _render_setting_brief(context.setting_brief)
+                if context.setting_brief
+                else f" {context.setting_note}"
+            ),
             f"  Target   : {context.word_count_target} words "
             f"(write between {int(context.word_count_target * 0.85)} "
             f"and {int(context.word_count_target * 1.15)} words)",
@@ -230,6 +255,24 @@ class SceneWriterAgent(BaseAgent):
             lines.append("SCENE GROUND TRUTH (these facts must be true by the end of this scene):")
             for fact in context.state_changes:
                 lines.append(f"  • {fact}")
+
+        # Inject locked story state
+        if context.story_state:
+            lines.append("")
+            lines.append("Locked Story State (hard facts at the start of this scene):")
+            if context.story_state.tracked_objects:
+                for obj_name, obj in context.story_state.tracked_objects.items():
+                    state_line = f"  Object — {obj_name}: {obj.state}"
+                    if obj.holder:
+                        state_line += f" (held by {obj.holder})"
+                    lines.append(state_line)
+            if context.story_state.character_positions:
+                for char_name, position in context.story_state.character_positions.items():
+                    lines.append(f"  {char_name} — {position}")
+            if context.story_state.open_wounds:
+                lines.append(f"  Open wounds: {'; '.join(context.story_state.open_wounds)}")
+            if context.story_state.open_promises:
+                lines.append(f"  Open promises: {'; '.join(context.story_state.open_promises)}")
 
         if context.continuity_digest:
             lines.append("")

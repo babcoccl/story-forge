@@ -27,9 +27,55 @@ from backend.app.agents.continuity_agent import ContinuityAgent
 from backend.app.agents.scene_writer_agent import SceneWriterAgent
 from backend.app.db.session import AsyncSessionLocal
 from backend.app.models.story import Story, StoryChapter, StoryScene
-from backend.app.schemas.story import SceneContext, SceneOutput, StoryBible, StoryPlan
+from backend.app.schemas.story import (
+    ArtifactEntry,
+    SceneContext,
+    SceneOutput,
+    StoryBible,
+    StoryPlan,
+    StoryState,
+    TrackedObject,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_artifacts(raw: object) -> list[ArtifactEntry] | None:
+    """Coerce planner artifacts output to list[ArtifactEntry], tolerating dict input."""
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return None
+    result = []
+    for item in raw:
+        if isinstance(item, ArtifactEntry):
+            result.append(item)
+        elif isinstance(item, dict):
+            try:
+                result.append(ArtifactEntry.model_validate(item))
+            except Exception:
+                pass  # skip malformed entries
+    return result or None
+
+
+def _coerce_character_roles(raw: object) -> dict[str, str] | None:
+    """Coerce planner characters output to dict[str, str], tolerating list input."""
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        return {k: str(v) for k, v in raw.items()}
+    if isinstance(raw, list):
+        result = {}
+        for item in raw:
+            if isinstance(item, dict):
+                name = item.get("name") or item.get("character_name")
+                role = item.get("role") or item.get("locked_role") or item.get("description", "")
+                if name:
+                    result[str(name)] = str(role)
+        return result or None
+    return None
 
 
 class SceneService:
@@ -37,6 +83,60 @@ class SceneService:
 
     def __init__(self) -> None:
         pass
+
+    # ---------- internal helpers ----------
+
+    def _apply_state_changes(
+        self,
+        story_state: StoryState,
+        state_changes: list[str] | None,
+    ) -> None:
+        """Mutate StoryState based on declarative state_change strings.
+
+        For each fact string:
+        - If a tracked_object key appears in the fact (case-insensitive),
+          overwrite that object's state field with the full fact.
+        - If a character_positions key appears, overwrite that position.
+        - If wound/injury keywords appear, append to open_wounds.
+        - If promise/vow/agreement keywords appear, append to open_promises.
+        """
+        if not state_changes:
+            return
+
+        wound_keywords = {"wound", "injury", "bleed", "bleeding", "bruise", "fracture", "scar", "hurt", "gash", "laceration", "burn"}
+        promise_keywords = {"promise", "vow", "agreement", "pledge", "oath", "debt", "commitment", "swear", "bargain", "deal"}
+
+        for fact in state_changes:
+            fact_lower = fact.lower()
+
+            # Update tracked objects
+            for key in list(story_state.tracked_objects.keys()):
+                if key.lower() in fact_lower:
+                    entry = story_state.tracked_objects[key]
+                    entry.state = fact
+                    break
+
+            # Update character positions
+            for key in list(story_state.character_positions.keys()):
+                if key.lower() in fact_lower:
+                    story_state.character_positions[key] = fact
+                    break
+
+            # Detect wounds
+            if not story_state.open_wounds or any(
+                kw in fact_lower for kw in wound_keywords
+            ):
+                if any(kw in fact_lower for kw in wound_keywords):
+                    if fact not in story_state.open_wounds:
+                        story_state.open_wounds.append(fact)
+
+            # Detect promises
+            if not story_state.open_promises or any(
+                kw in fact_lower for kw in promise_keywords
+            ):
+                if any(kw in fact_lower for kw in promise_keywords):
+                    if fact not in story_state.open_promises:
+                        story_state.open_promises.append(fact)
 
     async def write_all_scenes(
         self,
@@ -92,6 +192,21 @@ class SceneService:
             chars = story_bible.get("characters", {})
             if isinstance(chars, dict):
                 character_role_locks = {k: str(v) for k, v in chars.items()}
+
+        # --- Initialize StoryState seeded from artifacts ---
+        story_state = StoryState()
+
+        coerced_artifacts = _coerce_artifacts(artifacts)
+        if coerced_artifacts is not None:
+            for artifact in coerced_artifacts:
+                canonical = artifact.canonical_name or "Unknown"
+                state_text = artifact.current_state or artifact.description or "No known state"
+                story_state.tracked_objects[canonical] = TrackedObject(
+                    name=canonical,
+                    state=state_text,
+                    holder=artifact.last_known_location,
+                    notes=artifact.description,
+                )
 
         protagonist_name = ""
         protagonist_description = ""
@@ -157,6 +272,9 @@ class SceneService:
 
                 await writer.wake_server()
 
+                # Set chapter_goal at the start of each chapter
+                story_state.chapter_goal = chapter_plan.summary
+
                 for idx, scene_plan in enumerate(chapter_plan.scenes):
                     scene_orm = scene_orms[idx] if idx < len(scene_orms) else None
                     if scene_orm is None:
@@ -189,9 +307,11 @@ class SceneService:
                         previous_scene_closing=previous_closing,
                         scene_objective=scene_plan.scene_objective,
                         investigation_spine=investigation_spine,
-                        artifacts=artifacts,
-                        character_role_locks=character_role_locks,
+                        artifacts=_coerce_artifacts(artifacts),
+                        character_role_locks=_coerce_character_roles(character_role_locks),
                         state_changes=scene_plan.state_changes,
+                        setting_brief=scene_plan.setting_brief,
+                        story_state=story_state,
                     )
 
                     try:
@@ -202,6 +322,9 @@ class SceneService:
                         chapter_outputs.append(result)
                         if result.prose:
                             last_written_prose = result.prose
+                            # Mutate story_state from scene_plan.state_changes
+                            self._apply_state_changes(story_state, scene_plan.state_changes)
+                            story_state.scene_count += 1
                             # Update digest after every scene so next scene sees current state
                             try:
                                 await continuity.wake_server()

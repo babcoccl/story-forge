@@ -56,6 +56,39 @@ class StoryBible(BaseModel):
     character_states: dict[str, Any] | None = None
 
 
+class TrackedObject(BaseModel):
+    """A plot-relevant object whose state is tracked across scenes."""
+
+    name: str  # canonical name of the object
+    state: str  # current condition or location as a declarative sentence
+    holder: str | None = None  # who currently possesses it, if applicable
+    notes: str | None = None  # any other plot-relevant fact
+
+
+class SettingBrief(BaseModel):
+    """Sensory grounding brief for a single scene's location."""
+
+    location_name: str  # specific named place
+    time_of_day: str  # e.g. "pre-dawn", "high noon", "candlelit night"
+    sensory_details: str  # one to two sentences: dominant sight, sound, smell
+    spatial_note: str | None = None  # how the protagonist enters or where they stand when the scene opens
+
+
+class StoryState(BaseModel):
+    """Running hard-facts state assembled and mutated by SceneService.
+
+    This object is never produced by the LLM — it is built from artifacts,
+    state_changes parsing, and chapter goals.
+    """
+
+    tracked_objects: dict[str, TrackedObject] = Field(default_factory=dict)
+    character_positions: dict[str, str] = Field(default_factory=dict)
+    open_wounds: list[str] = Field(default_factory=list)
+    open_promises: list[str] = Field(default_factory=list)
+    chapter_goal: str | None = None
+    scene_count: int = 0
+
+
 class ScenePlan(BaseModel):
     """One scene within a chapter.
 
@@ -94,6 +127,10 @@ class ScenePlan(BaseModel):
             "Declarative sentences only. e.g. 'Jasper is now in custody at the warehouse.' "
             "This field is injected into the scene writer prompt as an immutable post-condition."
         ),
+    )
+    setting_brief: SettingBrief | None = Field(
+        default=None,
+        description="Sensory grounding brief: location_name, time_of_day, sensory_details, spatial_note",
     )
 
     @model_validator(mode="before")
@@ -266,6 +303,8 @@ class SceneContext(BaseModel):
     artifacts: list[ArtifactEntry] | None = None  # canonical artifact locks from story_bible
     character_role_locks: dict[str, str] | None = None  # character role locks from story_bible
     state_changes: list[str] | None = None  # locked facts from planner about what this scene must establish
+    setting_brief: SettingBrief | None = None  # sensory grounding brief from ScenePlan
+    story_state: StoryState | None = None  # running hard-facts state from SceneService
 
 
 class SceneOutput(BaseModel):

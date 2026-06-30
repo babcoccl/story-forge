@@ -163,17 +163,27 @@ class PlannerAgent(BaseAgent):
             "Act 2 (Ch 2): What larger network enabled it? "
             "Act 3 (Ch 3): What is at stake if the protagonist fails? "
             "Reveals must sharpen the dominant question, not replace it with a different one.\n\n"
-            "7. SCENE OBJECTIVE: Every scene must include scene_objective — one sentence "
-            "stating what the protagonist must achieve or learn before the scene can end. "
-            "This is separate from goal (narrative purpose) — it is the in-scene task.\n\n"
+            "7. SCENE OBJECTIVE + SETTING BRIEF: Every scene must include both scene_objective "
+            "and setting_brief.\n"
+            "   - scene_objective: one sentence stating what the protagonist must achieve or learn "
+            "before the scene can end (separate from goal — it is the in-scene task).\n"
+            "   - setting_brief: a structured object with four subfields that grounds the scene "
+            "in a concrete physical location before the plot advances:\n"
+            "     * location_name — the specific named place\n"
+            "     * time_of_day — e.g. pre-dawn, high noon, candlelit night\n"
+            "     * sensory_details — one to two sentences describing dominant sight, sound, and smell "
+            "(NOT a location label — the writer needs texture)\n"
+            "     * spatial_note — how the protagonist enters or where they stand when the scene opens\n"
+            "   The setting_brief must give the writer enough physical detail to open the scene "
+            "in-place without summarizing travel.\n\n"
             "JSON REQUIREMENTS:\n"
             "- Exactly {chapter_count} chapters\n"
             "- 3-5 scenes per chapter\n"
             "- Each chapter: chapter_number (int, 1-based), title, summary (2 sentences max), scenes\n"
             "- Each scene: scene_number, scene_objective, goal, conflict, outcome, state_changes, "
-            "setting_note, word_count_target\n"
+            "setting_brief, setting_note, word_count_target\n"
             "- Each scene must use EXACTLY these JSON keys: "
-            "scene_number, scene_objective, goal, conflict, outcome, state_changes, setting_note, word_count_target\n"
+            "scene_number, scene_objective, goal, conflict, outcome, state_changes, setting_brief, setting_note, word_count_target\n"
             "  Do NOT use setting_note_reference, word_count_allocation, or any other variant.\n"
             "- story_bible keys: investigation_spine, tone, pacing_notes, characters, "
             "factions, artifacts\n"
@@ -253,13 +263,18 @@ class PlannerAgent(BaseAgent):
         lines.append("")
         lines.append(
             "Scene JSON keys (exact): "
-            "scene_number, scene_objective, goal, conflict, outcome, state_changes, setting_note, word_count_target"
+            "scene_number, scene_objective, goal, conflict, outcome, state_changes, "
+            "setting_brief, setting_note, word_count_target"
         )
         lines.append("")
         lines.append("Before writing any scenes, write investigation_spine first.")
         lines.append("Every scene outcome must name a concrete consequence.")
         lines.append(
             "Every scene must include state_changes: a list of 3-5 declarative facts locked true after the scene."
+        )
+        lines.append(
+            "Every scene MUST include setting_brief with all four subfields: "
+            "location_name, time_of_day, sensory_details, spatial_note."
         )
         lines.append("")
         lines.append("/no_think")
